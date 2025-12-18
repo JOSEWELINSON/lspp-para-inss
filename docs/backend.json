@@ -1,0 +1,264 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile within the INSS application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "cpf": {
+          "type": "string",
+          "description": "User's CPF (Cadastro de Pessoas Físicas)."
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User's phone number."
+        },
+        "address": {
+          "type": "string",
+          "description": "User's full address."
+        }
+      },
+      "required": [
+        "id",
+        "cpf",
+        "name",
+        "email",
+        "phoneNumber",
+        "address"
+      ]
+    },
+    "Beneficio": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Beneficio",
+      "type": "object",
+      "description": "Represents a type of benefit offered by INSS.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the benefit."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the benefit."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the benefit."
+        },
+        "requirements": {
+          "type": "string",
+          "description": "Requirements to apply for this benefit."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "requirements"
+      ]
+    },
+    "SolicitacaoBeneficio": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SolicitacaoBeneficio",
+      "type": "object",
+      "description": "Represents a benefit application submitted by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the benefit application."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N SolicitacaoBeneficio)"
+        },
+        "beneficioId": {
+          "type": "string",
+          "description": "Reference to Beneficio. (Relationship: Beneficio 1:N SolicitacaoBeneficio)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the application (e.g., 'Em análise', 'Exigência', 'Aprovado', 'Reprovado')."
+        },
+        "dataSolicitacao": {
+          "type": "string",
+          "description": "Date and time when the application was submitted.",
+          "format": "date-time"
+        },
+        "documentIds": {
+          "type": "array",
+          "description": "References to Documentos. (Relationship: Documentos N:N SolicitacaoBeneficio)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "beneficioId",
+        "status",
+        "dataSolicitacao"
+      ]
+    },
+    "Documentos": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Documentos",
+      "type": "object",
+      "description": "Represents documents uploaded for a benefit application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the document."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Documentos)"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Name of the file."
+        },
+        "fileType": {
+          "type": "string",
+          "description": "Type of the file (e.g., 'image/jpeg', 'application/pdf')."
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "Size of the file in bytes."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "Date and time when the document was uploaded.",
+          "format": "date-time"
+        },
+        "fileUrl": {
+          "type": "string",
+          "description": "URL where the document is stored.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "fileName",
+        "fileType",
+        "fileSize",
+        "uploadDate",
+        "fileUrl"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/user_profiles/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profile data. The userId parameter identifies the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/beneficios/{beneficioId}",
+        "definition": {
+          "entityName": "Beneficio",
+          "schema": {
+            "$ref": "#/backend/entities/Beneficio"
+          },
+          "description": "Stores information about available INSS benefits. The beneficioId parameter identifies the benefit.",
+          "params": [
+            {
+              "name": "beneficioId",
+              "description": "The unique identifier for the benefit."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/user_profiles/{userId}/solicitacoes_beneficios/{solicitacaoId}",
+        "definition": {
+          "entityName": "SolicitacaoBeneficio",
+          "schema": {
+            "$ref": "#/backend/entities/SolicitacaoBeneficio"
+          },
+          "description": "Stores benefit applications submitted by users. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "solicitacaoId",
+              "description": "The unique identifier for the benefit application."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/user_profiles/{userId}/documentos/{documentId}",
+        "definition": {
+          "entityName": "Documentos",
+          "schema": {
+            "$ref": "#/backend/entities/Documentos"
+          },
+          "description": "Stores documents uploaded by users for their applications. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "documentId",
+              "description": "The unique identifier for the document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_inss_profissionais/{welinsonINSS17}",
+        "definition": {
+          "entityName": "INSSProfessional",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores IDs of INSS professionals who have admin access. Existence of document grants access. 'welinsonINSS17' is the document ID.",
+          "params": [
+            {
+              "name": "welinsonINSS17",
+              "description": "The unique identifier for the INSS professional."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the LSPP do INSS application, focusing on secure data management for user profiles, benefit information, applications, and associated documents. The structure emphasizes authorization independence and efficient data retrieval through denormalization and structural segregation.\n\n1.  **/user_profiles/{userId}**: Stores user profile data. This collection utilizes path-based ownership, ensuring that only the user can access their profile data.\n\n2.  **/beneficios/{beneficioId}**: Stores information about available benefits. This collection is globally readable, allowing all users to view benefit details.\n\n3.  **/user_profiles/{userId}/solicitacoes_beneficios/{solicitacaoId}**: Stores benefit applications submitted by users. This subcollection is owned by the user, and the `userId` is denormalized within each document to enforce authorization independence. This enables direct querying and listing of applications by user ID.\n\n4.  **/user_profiles/{userId}/documentos/{documentId}**: Stores documents uploaded by users for their applications.  This subcollection is owned by the user, and the `userId` is denormalized within each document to enforce authorization independence.\n\n5.  **/roles_inss_profissionais/{welinsonINSS17}**: A dedicated collection that stores IDs of INSS professionals. The existence of a document with the ID matching the `request.auth.uid` grants access to the admin features, like viewing all benefit applications.\n\n**Authorization Independence (CRITICAL):**\nAuthorization independence is achieved by denormalizing the `userId` in the `solicitacoes_beneficios` and `documentos` collections. This eliminates the need for `get()` calls in security rules to verify ownership, allowing for atomic operations and improved security.\n\n**QAPs (Rules are not Filters):**\nThe structure supports secure `list` operations by:\n*   Segregating user-specific data into subcollections under `/user_profiles/{userId}`. This ensures that listing operations are always scoped to a specific user, preventing unauthorized access to other users' data.\n*   Using path-based ownership for user profiles and related data. Security rules can efficiently check the request path to determine if the user has access to the requested documents.\n\n**Denormalization Strategy:**\nThe `userId` is denormalized in both `solicitacoes_beneficios` and `documentos` to avoid hierarchical dependencies.  This allows direct validation of ownership within the security rules without needing to read the parent `user_profiles` document.\n\n**Role-Based Access Control:**\nINSS professional access is managed using the `/roles_inss_profissionais/{welinsonINSS17}` collection. The security rules will check for the existence of a document with a specific `uid` in this collection to grant admin privileges.\n\nThis structure supports the core features of the application, including benefit requests, information retrieval, document uploads, and status monitoring, while adhering to the principles of security, scalability, and debuggability."
+  }
+}
