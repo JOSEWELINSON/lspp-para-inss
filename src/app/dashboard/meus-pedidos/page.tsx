@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
@@ -52,7 +53,7 @@ export default function MeusPedidosPage() {
     
     useEffect(() => {
         loadRequests();
-    }, [router]);
+    }, []);
 
     const loadRequests = () => {
         try {
@@ -93,33 +94,34 @@ export default function MeusPedidosPage() {
     const handleCumprirExigencia = () => {
         if (!currentRequest) return;
 
-        const updatedRequests = myRequests.map(req => {
-            if (req.id === currentRequest.id && req.exigencia) {
-                return {
-                    ...req,
-                    status: 'Em análise' as RequestStatus,
-                    exigencia: {
-                        ...req.exigencia,
-                        response: {
-                            text: exigenciaResponseText,
-                            files: exigenciaFiles.map(f => f.name),
-                            respondedAt: new Date().toISOString(),
-                        }
-                    }
-                };
-            }
-            return req;
-        });
-
         try {
             const appDataRaw = localStorage.getItem('appData');
-            const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
-            const currentUserCpf = localStorage.getItem('currentUserCpf');
-            const otherUserRequests = appData.requests.filter((r: UserRequest) => r.user.cpf !== currentUserCpf);
-            appData.requests = [...otherUserRequests, ...updatedRequests];
+            if (!appDataRaw) return;
+
+            const appData = JSON.parse(appDataRaw);
+            
+            const updatedRequests = appData.requests.map((req: UserRequest) => {
+                if (req.id === currentRequest.id && req.exigencia) {
+                    return {
+                        ...req,
+                        status: 'Em análise' as RequestStatus,
+                        exigencia: {
+                            ...req.exigencia,
+                            response: {
+                                text: exigenciaResponseText,
+                                files: exigenciaFiles.map(f => f.name),
+                                respondedAt: new Date().toISOString(),
+                            }
+                        }
+                    };
+                }
+                return req;
+            });
+            
+            appData.requests = updatedRequests;
             localStorage.setItem('appData', JSON.stringify(appData));
             
-            setMyRequests(updatedRequests);
+            loadRequests();
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
             setExigenciaFiles([]);
@@ -248,7 +250,11 @@ export default function MeusPedidosPage() {
                                                         <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
                                                             <p className="font-semibold">Arquivos enviados:</p>
                                                             <ul className="list-disc pl-4">
-                                                                {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
+                                                                {currentRequest.exigencia.response.files.map((file, i) => (
+                                                                    <li key={i}>
+                                                                        <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file}</a>
+                                                                    </li>
+                                                                ))}
                                                             </ul>
                                                         </div>
                                                     )}
@@ -333,7 +339,11 @@ export default function MeusPedidosPage() {
                                             <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
                                                 <p className="font-semibold">Arquivos enviados:</p>
                                                 <ul className="list-disc pl-4">
-                                                    {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
+                                                    {currentRequest.exigencia.response.files.map((file, i) => (
+                                                         <li key={i}>
+                                                            <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file}</a>
+                                                        </li>
+                                                    ))}
                                                 </ul>
                                             </div>
                                         )}
@@ -400,5 +410,7 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
+
+    
 
     

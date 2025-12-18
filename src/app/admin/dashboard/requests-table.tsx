@@ -235,7 +235,11 @@ export function AdminRequestsTable() {
                                         <p className="font-semibold text-sm">Documentos Anexados:</p>
                                         {(currentRequest.documents && currentRequest.documents.length > 0) ? (
                                             <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
-                                                {currentRequest.documents.map((doc, i) => <li key={i}>{doc}</li>)}
+                                                {currentRequest.documents.map((doc, i) => (
+                                                    <li key={i}>
+                                                        <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{doc}</a>
+                                                    </li>
+                                                ))}
                                             </ul>
                                         ) : (
                                             <p className="text-sm text-muted-foreground italic mt-1">Nenhum documento foi anexado na abertura do pedido.</p>
@@ -296,7 +300,11 @@ export function AdminRequestsTable() {
                                                             <p className="font-semibold">Arquivos enviados:</p>
                                                             {(currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0) ? (
                                                                 <ul className="list-disc pl-4">
-                                                                    {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
+                                                                    {currentRequest.exigencia.response.files.map((file, i) => (
+                                                                        <li key={i}>
+                                                                            <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file}</a>
+                                                                        </li>
+                                                                    ))}
                                                                 </ul>
                                                             ) : (
                                                                 <p className="italic">O usuário não anexou documentos.</p>
@@ -354,6 +362,8 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
+
+    
 
     
 
