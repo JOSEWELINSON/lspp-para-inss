@@ -5,7 +5,6 @@ import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import imageCompression from 'browser-image-compression';
-import jsPDF from 'jspdf';
 
 import {
   Table,
@@ -107,41 +106,21 @@ export default function MeusPedidosPage() {
                         useWebWorker: true,
                     };
                     const compressedFile = await imageCompression(file, options);
-
-                    const pdf = new jsPDF();
-                    const imgData = await fileToDataUrl(compressedFile);
-                    const img = new Image();
-                    img.src = imgData;
-                    await new Promise(resolve => { img.onload = resolve; });
-
-                    const imgWidth = img.width;
-                    const imgHeight = img.height;
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = pdf.internal.pageSize.getHeight();
-                    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-                    const width = imgWidth * ratio;
-                    const height = imgHeight * ratio;
-                    
-                    pdf.addImage(imgData, 'JPEG', (pdfWidth - width) / 2, (pdfHeight - height) / 2, width, height);
-
-                    const pdfBlob = pdf.getBlob();
-                    const pdfFile = new File([pdfBlob], `${file.name.split('.').slice(0, -1).join('.')}.pdf`, { type: 'application/pdf' });
-
-                    processedFiles.push(pdfFile);
+                    processedFiles.push(compressedFile);
 
                 } catch (error) {
                     toast({
                         variant: "destructive",
-                        title: "Falha na conversão para PDF",
+                        title: "Falha na compressão",
                         description: `Não foi possível processar a imagem "${file.name}".`,
                     });
                 }
             } else if (file.type === 'application/pdf') {
-                 if (file.size > 1024 * 1024 * 2) { // 2MB limit for PDFs
+                 if (file.size > 1024 * 1024) { // 1MB limit for PDFs
                     toast({
                         variant: "destructive",
                         title: "Arquivo PDF Muito Grande",
-                        description: `O arquivo "${file.name}" excede 2MB e não pode ser enviado.`,
+                        description: `O arquivo "${file.name}" excede 1MB e não pode ser enviado.`,
                     });
                 } else {
                     processedFiles.push(file);
@@ -516,7 +495,7 @@ export default function MeusPedidosPage() {
                                          accept="image/*,application/pdf"
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Imagens são convertidas para PDF. PDFs devem ter menos de 2MB.
+                                         Imagens são comprimidas. PDFs devem ter menos de 1MB.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (
