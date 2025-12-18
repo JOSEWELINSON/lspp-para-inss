@@ -36,7 +36,6 @@ import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } fro
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile } from '@/firebase/storage';
-import { FormDescription, FormItem } from '@/components/ui/form';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -79,6 +78,7 @@ export default function MeusPedidosPage() {
 
     const handleOpenExigencia = (request: UserRequest) => {
         setCurrentRequest(request);
+        setIsDetailsModalOpen(false);
         setIsExigenciaModalOpen(true);
     };
     
@@ -163,7 +163,7 @@ export default function MeusPedidosPage() {
     const formatDate = (date: any) => {
         if (!date) return '';
         if (typeof date === 'string') return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-        if (date.seconds) return format(date.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+        if (date?.seconds) return format(date.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
         return '';
     }
 
@@ -208,7 +208,7 @@ export default function MeusPedidosPage() {
                                 </TableCell>
                             </TableRow>
                         ) : myRequests && myRequests.length > 0 ? myRequests.map((request) => (
-                            <TableRow key={request.id} onClick={() => openDetailsModal(request)} className={`cursor-pointer ${request.status === 'Exigência' ? 'bg-orange-100/50 dark:bg-orange-900/20' : ''}`}>
+                            <TableRow key={request.id} onClick={() => openDetailsModal(request)} className={`cursor-pointer ${request.status === 'Exigência' && !request.exigencia?.response ? 'bg-orange-100/50 dark:bg-orange-900/20' : ''}`}>
                                 <TableCell className="font-medium">{request.benefitTitle}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline">{request.protocol}</Badge>
@@ -338,7 +338,7 @@ export default function MeusPedidosPage() {
                                         <Card className="bg-orange-50 border-orange-200 mt-4 text-center">
                                             <CardContent className="p-3">
                                                 <p className="text-sm text-orange-800">
-                                                    Você tem uma exigência pendente. Clique em "Responder" na tela anterior para cumpri-la.
+                                                    Você tem uma exigência pendente. Clique em "Responder" para cumpri-la.
                                                 </p>
                                             </CardContent>
                                         </Card>
@@ -355,7 +355,6 @@ export default function MeusPedidosPage() {
                          {currentRequest.status === 'Exigência' && !currentRequest.exigencia?.response && (
                             <Button onClick={(e) => {
                                 e.stopPropagation();
-                                setIsDetailsModalOpen(false);
                                 handleOpenExigencia(currentRequest);
                             }}>
                                 <AlertTriangle className="mr-2 h-4 w-4" />

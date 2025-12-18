@@ -99,11 +99,11 @@ export function SolicitarBeneficioForm() {
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
         
         const uploadedDocuments: Documento[] = [];
-        if (filesToUpload.length > 0) {
-            for (const file of filesToUpload) {
-                const uploadedDoc = await uploadFile(storage, file, `requests/${protocol}/${file.name}`);
-                uploadedDocuments.push(uploadedDoc);
-            }
+        // Use a sequential for...of loop for robust async operations
+        for (const file of filesToUpload) {
+            const filePath = `requests/${protocol}/${Date.now()}_${file.name}`;
+            const uploadedDoc = await uploadFile(storage, file, filePath);
+            uploadedDocuments.push(uploadedDoc);
         }
 
         const newRequest: Omit<UserRequest, 'id'> = {
