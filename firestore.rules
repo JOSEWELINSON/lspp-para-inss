@@ -17,10 +17,9 @@ service cloud.firestore {
       return isOwner(userId) && resource != null;
     }
 
-    // Checks if the authenticated user is an INSS professional by looking for
-    // their UID in the admins collection.
+    // Checks if the authenticated user has the 'isAdmin' custom claim.
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.isAdmin == true;
+      return isSignedIn() && request.auth.token.isAdmin == true;
     }
 
     // User can manage their own profile
@@ -36,6 +35,7 @@ service cloud.firestore {
       allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       
       // Collection query access: Admins can list all. Users can list only their own.
+      // This rule secures collection queries (e.g., useCollection)
       allow list: if isAdmin() || (isSignedIn() && request.query.where.get('userId') == request.auth.uid);
       
       // Create access: Authenticated user must be the owner of the new request.
@@ -51,7 +51,7 @@ service cloud.firestore {
     // Admins collection is read-only for clients, managed server-side.
     match /admins/{adminId} {
         allow read: if isSignedIn();
-        allow write: if false;
+        allow write: if false; // Should only be written from a trusted backend
     }
   }
 }
