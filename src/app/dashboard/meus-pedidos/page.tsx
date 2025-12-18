@@ -1,6 +1,5 @@
-
 'use client';
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, Fragment, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon } from 'lucide-react';
 import { format, addDays } from 'date-fns';
@@ -68,7 +67,7 @@ export default function MeusPedidosPage() {
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
-    const [exigenciaFiles, setExigenciaFiles] = useState<File[]>([]);
+    const [exigenciaFiles, setExigenciaFiles] = useState<Document[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     
     const openDetailsModal = (request: UserRequest) => {
@@ -79,32 +78,43 @@ export default function MeusPedidosPage() {
     const handleOpenExigencia = (request: UserRequest) => {
         setCurrentRequest(request);
         setExigenciaResponseText(request.exigencia?.response?.text || "");
+        setExigenciaFiles(request.exigencia?.response?.files || []);
         setIsExigenciaModalOpen(true);
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setExigenciaFiles(Array.from(e.target.files));
+    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !currentRequest) return;
+        
+        setIsUploading(true);
+        const files = Array.from(e.target.files);
+        
+        try {
+            const uploadPromises = files.map(file => 
+                uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`)
+            );
+            const uploadedDocuments = await Promise.all(uploadPromises);
+            setExigenciaFiles(prev => [...prev, ...uploadedDocuments]);
+            toast({ title: 'Upload Concluído', description: `${files.length} arquivo(s) foram enviados.` });
+        } catch (error) {
+            console.error("Failed to upload files", error);
+            toast({
+                variant: "destructive",
+                title: "Falha no Upload",
+                description: "Não foi possível enviar um ou mais arquivos. Tente novamente."
+            });
+        } finally {
+            setIsUploading(false);
         }
     };
 
     const handleCumprirExigencia = async () => {
-        if (!currentRequest || !userCpf || !storage) return;
+        if (!currentRequest || !userCpf) return;
         setIsUploading(true);
 
         try {
-            let documents: Document[] = [];
-            if (exigenciaFiles.length > 0) {
-                const filesToUpload = Array.from(exigenciaFiles);
-                const uploadPromises = filesToUpload.map(file => 
-                    uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`)
-                );
-                documents = await Promise.all(uploadPromises);
-            }
-
             const response = {
                 text: exigenciaResponseText,
-                files: documents,
+                files: exigenciaFiles,
                 respondedAt: new Date().toISOString(),
             };
             
@@ -240,7 +250,7 @@ export default function MeusPedidosPage() {
                             </div>
                             <div>
                                 <div className="font-semibold">Status</div>
-                                <div><Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge></div>
+                                <Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge>
                             </div>
                         </div>
                         
@@ -408,11 +418,24 @@ export default function MeusPedidosPage() {
                                             <Upload className="h-5 w-5 text-gray-400" />
                                         </div>
                                     </div>
+                                     {isUploading && (
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span>Carregando arquivos...</span>
+                                        </div>
+                                    )}
                                     {exigenciaFiles.length > 0 && (
-                                        <div className="text-sm text-muted-foreground">
-                                            <p>Arquivos selecionados:</p>
+                                        <div className="text-sm text-muted-foreground mt-2 space-y-1">
+                                            <p className="font-medium">Arquivos carregados:</p>
                                             <ul className="list-disc pl-5">
-                                                {exigenciaFiles.map(file => <li key={file.name}>{file.name}</li>)}
+                                                {exigenciaFiles.map((file, i) => (
+                                                    <li key={i}>
+                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary flex items-center gap-1">
+                                                          <LinkIcon className="h-3 w-3" />
+                                                          {file.name}
+                                                        </a>
+                                                    </li>
+                                                ))}
                                             </ul>
                                         </div>
                                     )}
@@ -443,5 +466,3 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
-
-    

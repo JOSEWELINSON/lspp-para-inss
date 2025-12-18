@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, Link as LinkIcon } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,6 @@ const formSchema = z.object({
   description: z.string().min(10, {
     message: "A descrição deve ter pelo menos 10 caracteres.",
   }),
-  documents: z.any().optional(),
 });
 
 function getUserCpf() {
@@ -53,7 +52,9 @@ function getUserCpf() {
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadedDocuments, setUploadedDocuments] = useState<Document[]>([]);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
@@ -69,37 +70,49 @@ export function SolicitarBeneficioForm() {
     },
   });
   
-  const fileRef = form.register("documents");
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    
+    setIsUploading(true);
+    const files = Array.from(e.target.files);
+    const requestId = `${userCpf}-${Date.now()}`; // Create a temporary unique ID for this upload batch
+    
+    try {
+        const uploadPromises = files.map(file => 
+            uploadFile(storage, file, `requests/${requestId}/${file.name}`)
+        );
+        const newDocuments = await Promise.all(uploadPromises);
+        setUploadedDocuments(prev => [...prev, ...newDocuments]);
+        toast({ title: 'Upload Concluído', description: `${files.length} arquivo(s) foram enviados.` });
+    } catch (error) {
+        console.error("Failed to upload files", error);
+        toast({
+            variant: "destructive",
+            title: "Falha no Upload",
+            description: "Não foi possível enviar um ou mais arquivos. Tente novamente."
+        });
+    } finally {
+        setIsUploading(false);
+    }
+  };
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!userCpf || !userProfile || !storage) {
+    if (!userCpf || !userProfile) {
         toast({
             variant: 'destructive',
-            title: "Erro de Autenticação ou Configuração",
-            description: "Usuário ou serviço de storage não encontrado. Faça o login novamente.",
+            title: "Erro de Autenticação",
+            description: "Usuário não encontrado. Faça o login novamente.",
         });
         router.push('/');
         return;
     }
 
-    setIsUploading(true);
+    setIsSubmitting(true);
     
     try {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
-        const requestId = `${userCpf}-${Date.now()}`;
         
-        const documentFiles = values.documents as FileList | null;
-        let documents: Document[] = [];
-
-        if (documentFiles && documentFiles.length > 0) {
-            const filesToUpload = Array.from(documentFiles);
-            const uploadPromises = filesToUpload.map(file => 
-                uploadFile(storage, file, `requests/${requestId}/${file.name}`)
-            );
-            documents = await Promise.all(uploadPromises);
-        }
-
         const newRequest: Omit<UserRequest, 'id'> = {
             protocol,
             benefitId: values.benefitId,
@@ -107,7 +120,7 @@ export function SolicitarBeneficioForm() {
             requestDate: serverTimestamp(),
             status: 'Em análise',
             description: values.description,
-            documents: documents,
+            documents: uploadedDocuments,
             userId: userCpf, 
             user: {
                 name: userProfile.fullName,
@@ -132,11 +145,11 @@ export function SolicitarBeneficioForm() {
           description: error.message || "Não foi possível registrar seu pedido. Verifique suas permissões ou tente novamente.",
         });
     } finally {
-        setIsUploading(false);
+        setIsSubmitting(false);
     }
   }
 
-  const isLoading = isUserLoading || isUploading;
+  const isLoading = isUserLoading || isSubmitting;
 
   return (
     <Card>
@@ -193,32 +206,46 @@ export function SolicitarBeneficioForm() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="documents"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Anexar Documentos (Opcional)</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input type="file" className="pl-12" multiple {...fileRef} disabled={isLoading}/>
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <Upload className="h-5 w-5 text-gray-400" />
-                      </div>
-                    </div>
-                  </FormControl>
-                  <FormDescription>
-                    Anexe RG, CPF, comprovante de residência, laudos médicos, etc.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
+            <FormItem>
+              <FormLabel>Anexar Documentos</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Input type="file" className="pl-12" multiple onChange={handleFileChange} disabled={isLoading || isUploading} />
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <Upload className="h-5 w-5 text-gray-400" />
+                  </div>
+                </div>
+              </FormControl>
+              <FormDescription>
+                Anexe RG, CPF, comprovante de residência, laudos médicos, etc.
+              </FormDescription>
+              {isUploading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Carregando arquivos...</span>
+                </div>
               )}
-            />
+              {uploadedDocuments.length > 0 && (
+                <div className="text-sm text-muted-foreground mt-2 space-y-1">
+                    <p className="font-medium">Arquivos carregados:</p>
+                    <ul className="list-disc pl-5">
+                        {uploadedDocuments.map((doc, i) => (
+                            <li key={i}>
+                                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary flex items-center gap-1">
+                                    <LinkIcon className="h-3 w-3" />
+                                    {doc.name}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+              )}
+            </FormItem>
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || isUploading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isUploading ? 'Enviando...' : 'Enviar Solicitação'}
+              {isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}
             </Button>
           </CardFooter>
         </form>
@@ -226,5 +253,3 @@ export function SolicitarBeneficioForm() {
     </Card>
   );
 }
-
-    
