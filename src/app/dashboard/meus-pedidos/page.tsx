@@ -36,6 +36,7 @@ import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } fro
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile } from '@/firebase/storage';
+import { FormDescription, FormItem } from '@/components/ui/form';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -111,7 +112,9 @@ export default function MeusPedidosPage() {
             const uploadedDocuments: Documento[] = [];
             // Use a sequential for...of loop for robust async operations
             for (const file of filesToUpload) {
-                const uploadedDoc = await uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`);
+                const protocol = currentRequest.protocol || `REQ${Date.now()}`;
+                const filePath = `requests/${protocol}/exigencia/${Date.now()}_${file.name}`;
+                const uploadedDoc = await uploadFile(storage, file, filePath);
                 uploadedDocuments.push(uploadedDoc);
             }
 
@@ -165,6 +168,7 @@ export default function MeusPedidosPage() {
     }
 
     const getPrazoExigencia = (createdAt: any) => {
+        if (!createdAt) return null;
         const date = createdAt?.seconds ? new Date(createdAt.seconds * 1000) : new Date(createdAt);
         const prazo = addDays(date, 30);
         return format(prazo, "dd/MM/yyyy");
@@ -373,11 +377,13 @@ export default function MeusPedidosPage() {
                             <AlertTriangle className="text-orange-500" />
                             Cumprir Exigência
                         </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Protocolo: {currentRequest.protocol}
-                            {' | '}
-                            Prazo: <strong>{getPrazoExigencia(currentRequest.exigencia.createdAt)}</strong>
-                        </AlertDialogDescription>
+                        {currentRequest.exigencia.createdAt && (
+                            <AlertDialogDescription>
+                                Protocolo: {currentRequest.protocol}
+                                {' | '}
+                                Prazo: <strong>{getPrazoExigencia(currentRequest.exigencia.createdAt)}</strong>
+                            </AlertDialogDescription>
+                        )}
                     </AlertDialogHeader>
                     
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 -mr-4">
@@ -421,31 +427,31 @@ export default function MeusPedidosPage() {
                                         disabled={isUploading}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Anexar Novos Documentos</Label>
-                                    <Button 
-                                        type="button" 
-                                        variant="outline" 
-                                        onClick={() => fileInputRef.current?.click()} 
-                                        disabled={isUploading}
-                                        className="w-fit"
-                                    >
-                                        <Upload className="mr-2 h-4 w-4" />
-                                        Selecionar Arquivos
-                                    </Button>
-                                    <Input 
-                                        id="exigencia-file-upload"
-                                        type="file" 
-                                        className="hidden" 
-                                        onChange={handleFileChange} 
-                                        multiple 
-                                        disabled={isUploading}
-                                        ref={fileInputRef}
-                                    />
+                                 <div className="space-y-2">
+                                     <Label>Anexar Novos Documentos (PDF, Foto)</Label>
+                                     <Button 
+                                         type="button" 
+                                         variant="outline" 
+                                         onClick={() => fileInputRef.current?.click()} 
+                                         disabled={isUploading}
+                                         className="w-fit"
+                                     >
+                                         <Upload className="mr-2 h-4 w-4" />
+                                         Selecionar Arquivos
+                                     </Button>
+                                     <Input 
+                                         id="exigencia-file-upload"
+                                         type="file" 
+                                         className="hidden" 
+                                         onChange={handleFileChange} 
+                                         multiple 
+                                         disabled={isUploading}
+                                         ref={fileInputRef}
+                                     />
                                      <p className="text-sm text-muted-foreground">
-                                        Máx: 20MB por arquivo.
-                                    </p>
-                                </div>
+                                         Máx: 20MB por arquivo.
+                                     </p>
+                                 </div>
                                 {filesToUpload.length > 0 && (
                                     <div className="space-y-2">
                                         <h4 className="text-sm font-medium">Arquivos selecionados:</h4>
