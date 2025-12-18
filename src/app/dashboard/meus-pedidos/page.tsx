@@ -117,9 +117,9 @@ export default function MeusPedidosPage() {
         if (imageFiles.length > 0) {
             try {
                 const pdf = new jsPDF();
-                let isFirstImage = true;
-
-                for (const file of imageFiles) {
+                
+                for (let i = 0; i < imageFiles.length; i++) {
+                    const file = imageFiles[i];
                     const options = {
                         maxSizeMB: 1,
                         maxWidthOrHeight: 1920,
@@ -134,11 +134,10 @@ export default function MeusPedidosPage() {
                     const pdfWidth = pdf.internal.pageSize.getWidth();
                     const pdfHeight = (img.height * pdfWidth) / img.width;
 
-                    if (!isFirstImage) {
+                    if (i > 0) {
                         pdf.addPage();
                     }
                     pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                    isFirstImage = false;
                 }
                 
                 const pdfBlob = pdf.getBlob();
