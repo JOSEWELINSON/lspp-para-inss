@@ -24,16 +24,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Requests collection access rules (SIMPLIFIED FOR PROTOTYPE)
+    // Requests collection access rules
+    // Read is public for the prototype to ensure the admin panel can list all requests.
+    // Write is restricted to authenticated users.
     match /requests/{requestId} {
-      // Any authenticated user can read/write.
-      // In a real app, this would be locked down to owners and admins.
-      allow read, write: if isSignedIn();
+      allow read: if true;
+      allow write: if isSignedIn();
     }
     
-    // Admins collection is read-only for clients, managed server-side.
+    // Admins collection is publicly readable, but can only be written server-side.
     match /admins/{adminId} {
-        allow read: if isSignedIn();
+        allow read: if true;
         allow write: if false; // Should only be written from a trusted backend
     }
   }
