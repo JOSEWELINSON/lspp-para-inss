@@ -86,13 +86,15 @@ export function SolicitarBeneficioForm() {
     try {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
+        // Use userCpf and timestamp to create a more unique ID for the request and its folder.
         const requestId = `${userCpf}-${Date.now()}`;
         
         const documentFiles = values.documents as FileList | null;
         const documents: Document[] = [];
 
-        if (documentFiles) {
+        if (documentFiles && documentFiles.length > 0) {
             for (const file of Array.from(documentFiles)) {
+                // The path now includes the unique requestId
                 const downloadUrl = await uploadFile(file, `requests/${requestId}/${file.name}`);
                 documents.push({ name: file.name, url: downloadUrl });
             }
@@ -128,7 +130,7 @@ export function SolicitarBeneficioForm() {
         toast({
           variant: "destructive",
           title: "Erro ao Enviar Solicitação",
-          description: error.message || "Não foi possível registrar seu pedido. Tente novamente.",
+          description: error.message || "Não foi possível registrar seu pedido. Verifique suas permissões ou tente novamente.",
         });
     } finally {
         setIsLoading(false);

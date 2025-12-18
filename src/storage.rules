@@ -1,0 +1,13 @@
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // ATENÇÃO: Regras abertas para fins de prototipagem.
+    // Permite leitura e escrita de arquivos para qualquer pessoa.
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
