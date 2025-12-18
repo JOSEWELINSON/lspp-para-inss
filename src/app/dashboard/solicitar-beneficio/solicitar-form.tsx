@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Upload, Link as LinkIcon } from "lucide-react";
+import { Loader2, Upload, Link as LinkIcon, Paperclip } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -53,8 +53,7 @@ export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedDocuments, setUploadedDocuments] = useState<Document[]>([]);
+  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
@@ -70,31 +69,9 @@ export function SolicitarBeneficioForm() {
     },
   });
   
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !userCpf) return;
-    
-    setIsUploading(true);
-    const files = Array.from(e.target.files);
-    const requestId = `${userCpf}-${Date.now()}`;
-    
-    try {
-      const uploadPromises = files.map(file => 
-        uploadFile(storage, file, `requests/${requestId}/${file.name}`)
-      );
-      
-      const newDocuments = await Promise.all(uploadPromises);
-      
-      setUploadedDocuments(prev => [...prev, ...newDocuments]);
-      toast({ title: 'Upload Concluído', description: `${files.length} arquivo(s) foram enviados.` });
-    } catch (error) {
-        console.error("Failed to upload files", error);
-        toast({
-            variant: "destructive",
-            title: "Falha no Upload",
-            description: "Não foi possível enviar um ou mais arquivos. Tente novamente."
-        });
-    } finally {
-        setIsUploading(false);
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFilesToUpload(Array.from(e.target.files));
     }
   };
   
@@ -112,6 +89,16 @@ export function SolicitarBeneficioForm() {
     setIsSubmitting(true);
     
     try {
+        const requestId = `${userCpf}-${Date.now()}`;
+        
+        let uploadedDocuments: Document[] = [];
+        if (filesToUpload.length > 0) {
+            const uploadPromises = filesToUpload.map(file => 
+                uploadFile(storage, file, `requests/${requestId}/${file.name}`)
+            );
+            uploadedDocuments = await Promise.all(uploadPromises);
+        }
+        
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
         
@@ -144,7 +131,13 @@ export function SolicitarBeneficioForm() {
         toast({
           variant: "destructive",
           title: "Erro ao Enviar Solicitação",
-          description: error.message || "Não foi possível registrar seu pedido. Verifique suas permissões ou tente novamente.",
+          description: error.message?.includes('storage/unauthorized') 
+            ? "Você não tem permissão para enviar arquivos." 
+            : error.message?.includes('storage/object-not-found') 
+            ? "O arquivo não foi encontrado."
+            : error.message?.includes('size-exceeded')
+            ? "O arquivo excede o tamanho máximo de 20MB."
+            : "Não foi possível registrar seu pedido. Tente novamente.",
         });
     } finally {
         setIsSubmitting(false);
@@ -212,31 +205,23 @@ export function SolicitarBeneficioForm() {
               <FormLabel>Anexar Documentos</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <Input type="file" className="pl-12" multiple onChange={handleFileChange} disabled={isLoading || isUploading} />
+                  <Input type="file" className="pl-12" multiple onChange={handleFileChange} disabled={isLoading} />
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <Upload className="h-5 w-5 text-gray-400" />
                   </div>
                 </div>
               </FormControl>
               <FormDescription>
-                Anexe RG, CPF, comprovante de residência, laudos médicos, etc.
+                Anexe RG, CPF, comprovante de residência, laudos médicos, etc. (Máx: 20MB por arquivo).
               </FormDescription>
-              {isUploading && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Carregando arquivos...</span>
-                </div>
-              )}
-              {uploadedDocuments.length > 0 && (
+              {filesToUpload.length > 0 && (
                 <div className="text-sm text-muted-foreground mt-2 space-y-1">
-                    <p className="font-medium">Arquivos carregados:</p>
+                    <p className="font-medium">Arquivos a serem enviados:</p>
                     <ul className="list-disc pl-5">
-                        {uploadedDocuments.map((doc, i) => (
-                            <li key={i}>
-                                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary flex items-center gap-1">
-                                    <LinkIcon className="h-3 w-3" />
-                                    {doc.name}
-                                </a>
+                        {filesToUpload.map((file, i) => (
+                            <li key={i} className="flex items-center gap-2">
+                                <Paperclip className="h-3 w-3" />
+                                {file.name}
                             </li>
                         ))}
                     </ul>
@@ -245,7 +230,7 @@ export function SolicitarBeneficioForm() {
             </FormItem>
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
-            <Button type="submit" disabled={isLoading || isUploading}>
+            <Button type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}
             </Button>

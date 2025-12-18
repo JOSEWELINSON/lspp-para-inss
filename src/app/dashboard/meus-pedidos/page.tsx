@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState, Fragment, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -68,7 +68,7 @@ export default function MeusPedidosPage() {
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
-    const [exigenciaFiles, setExigenciaFiles] = useState<Document[]>([]);
+    const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     
     const openDetailsModal = (request: UserRequest) => {
@@ -78,33 +78,12 @@ export default function MeusPedidosPage() {
 
     const handleOpenExigencia = (request: UserRequest) => {
         setCurrentRequest(request);
-        setExigenciaResponseText(request.exigencia?.response?.text || "");
-        setExigenciaFiles(request.exigencia?.response?.files || []);
         setIsExigenciaModalOpen(true);
     };
 
-    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || !currentRequest) return;
-        
-        setIsUploading(true);
-        const files = Array.from(e.target.files);
-        
-        try {
-            const uploadPromises = files.map(file => 
-                uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`)
-            );
-            const uploadedDocuments = await Promise.all(uploadPromises);
-            setExigenciaFiles(prev => [...prev, ...uploadedDocuments]);
-            toast({ title: 'Upload Concluído', description: `${files.length} arquivo(s) foram enviados.` });
-        } catch (error) {
-            console.error("Failed to upload files", error);
-            toast({
-                variant: "destructive",
-                title: "Falha no Upload",
-                description: "Não foi possível enviar um ou mais arquivos. Tente novamente."
-            });
-        } finally {
-            setIsUploading(false);
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setFilesToUpload(Array.from(e.target.files));
         }
     };
 
@@ -113,9 +92,17 @@ export default function MeusPedidosPage() {
         setIsUploading(true);
 
         try {
+            let uploadedDocuments: Document[] = [];
+            if (filesToUpload.length > 0) {
+                const uploadPromises = filesToUpload.map(file => 
+                    uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`)
+                );
+                uploadedDocuments = await Promise.all(uploadPromises);
+            }
+
             const response = {
                 text: exigenciaResponseText,
-                files: exigenciaFiles,
+                files: uploadedDocuments,
                 respondedAt: new Date().toISOString(),
             };
             
@@ -137,7 +124,7 @@ export default function MeusPedidosPage() {
             
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
-            setExigenciaFiles([]);
+            setFilesToUpload([]);
             const updatedRequest = { ...currentRequest, ...payload };
             setCurrentRequest(updatedRequest);
             setIsDetailsModalOpen(true);
@@ -419,22 +406,23 @@ export default function MeusPedidosPage() {
                                             <Upload className="h-5 w-5 text-gray-400" />
                                         </div>
                                     </div>
+                                    <FormDescription>
+                                        Máx: 20MB por arquivo.
+                                    </FormDescription>
                                      {isUploading && (
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <Loader2 className="h-4 w-4 animate-spin" />
                                             <span>Carregando arquivos...</span>
                                         </div>
                                     )}
-                                    {exigenciaFiles.length > 0 && (
+                                    {filesToUpload.length > 0 && (
                                         <div className="text-sm text-muted-foreground mt-2 space-y-1">
-                                            <p className="font-medium">Arquivos carregados:</p>
+                                            <p className="font-medium">Arquivos a serem enviados:</p>
                                             <ul className="list-disc pl-5">
-                                                {exigenciaFiles.map((file, i) => (
-                                                    <li key={i}>
-                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary flex items-center gap-1">
-                                                          <LinkIcon className="h-3 w-3" />
-                                                          {file.name}
-                                                        </a>
+                                                {filesToUpload.map((file, i) => (
+                                                    <li key={i} className="flex items-center gap-2">
+                                                        <Paperclip className="h-3 w-3" />
+                                                        {file.name}
                                                     </li>
                                                 ))}
                                             </ul>
@@ -453,7 +441,7 @@ export default function MeusPedidosPage() {
                     </div>
                     
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Fechar</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => { setFilesToUpload([]); setExigenciaResponseText(""); }}>Fechar</AlertDialogCancel>
                          {!currentRequest.exigencia.response && (
                             <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() || isUploading}>
                                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
