@@ -81,51 +81,16 @@ export function SolicitarBeneficioForm() {
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-
     setIsSubmitting(true);
+
     const selectedFiles = Array.from(e.target.files);
+    const imageFiles = selectedFiles.filter(file => file.type.startsWith('image/'));
+    const otherFiles = selectedFiles.filter(file => !file.type.startsWith('image/'));
     const processedFiles: File[] = [];
 
-    for (const file of selectedFiles) {
-        const isImage = file.type.startsWith('image/');
-
-        if (isImage) {
-            try {
-                const options = {
-                    maxSizeMB: 1,
-                    maxWidthOrHeight: 1920,
-                    useWebWorker: true,
-                };
-                const compressedFile = await imageCompression(file, options);
-                
-                // Convert compressed image to PDF
-                const pdf = new jsPDF();
-                const imgData = await fileToDataUrl(compressedFile);
-                const img = new Image();
-                img.src = imgData;
-                await new Promise(resolve => { img.onload = resolve; });
-
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (img.height * pdfWidth) / img.width;
-                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                
-                const pdfBlob = pdf.getBlob();
-                const pdfFile = new File([pdfBlob], `${file.name.split('.')[0]}.pdf`, { type: 'application/pdf' });
-                
-                processedFiles.push(pdfFile);
-                toast({
-                    title: "Imagem Convertida para PDF",
-                    description: `A imagem "${file.name}" foi comprimida e salva como PDF.`,
-                });
-
-            } catch (error) {
-                toast({
-                    variant: "destructive",
-                    title: "Falha na Conversão",
-                    description: `Não foi possível processar a imagem "${file.name}".`,
-                });
-            }
-        } else if (file.size > 1024 * 1024) { // 1MB limit for non-image files
+    // Process other files (PDFs, etc.)
+    for (const file of otherFiles) {
+        if (file.size > 1024 * 1024) { // 1MB limit for non-images
             toast({
                 variant: "destructive",
                 title: "Arquivo Muito Grande",
@@ -135,10 +100,59 @@ export function SolicitarBeneficioForm() {
             processedFiles.push(file);
         }
     }
+
+    // Process image files into a single PDF
+    if (imageFiles.length > 0) {
+        try {
+            const pdf = new jsPDF();
+            let isFirstImage = true;
+
+            for (const file of imageFiles) {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                };
+                const compressedFile = await imageCompression(file, options);
+                const imgData = await fileToDataUrl(compressedFile);
+                const img = new Image();
+                img.src = imgData;
+                await new Promise(resolve => { img.onload = resolve; });
+
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (img.height * pdfWidth) / img.width;
+                
+                if (!isFirstImage) {
+                    pdf.addPage();
+                }
+                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                isFirstImage = false;
+            }
+            
+            const pdfBlob = pdf.getBlob();
+            const pdfFile = new File([pdfBlob], 'imagens-comprovantes.pdf', { type: 'application/pdf' });
+            
+            processedFiles.push(pdfFile);
+            toast({
+                title: "Imagens Convertidas",
+                description: `${imageFiles.length} imagem(ns) foram comprimidas e agrupadas em um único PDF.`,
+            });
+
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Falha na Conversão de Imagem",
+                description: "Não foi possível processar as imagens para PDF.",
+            });
+        }
+    }
     
     setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
     setIsSubmitting(false);
+    // Reset file input to allow selecting the same file again
+    if(e.target) e.target.value = '';
   };
+
 
   const removeFile = (index: number) => {
     setFilesToUpload(prevFiles => prevFiles.filter((_, i) => i !== index));
@@ -296,7 +310,7 @@ export function SolicitarBeneficioForm() {
                       Selecionar Arquivos
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                      Imagens serão convertidas para PDF. Outros arquivos devem ser menores que 1MB.
+                      Imagens serão agrupadas em um único PDF. Outros arquivos devem ser menores que 1MB.
                   </p>
                 </div>
             </div>
