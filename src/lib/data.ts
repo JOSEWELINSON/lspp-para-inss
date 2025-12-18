@@ -45,6 +45,8 @@ export type UserRequest = {
   benefitTitle: string;
   requestDate: string;
   status: RequestStatus;
+  description: string;
+  documents: string[];
   user: {
     name: string;
     cpf: string;
@@ -68,3 +70,5 @@ export const mockUser = {
   phone: "(00) 00000-0000",
   address: "Endereço do usuário",
 };
+
+    

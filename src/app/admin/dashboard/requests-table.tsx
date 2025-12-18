@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Paperclip as PaperclipIcon } from 'lucide-react';
 import { type RequestStatus, type UserRequest } from '@/lib/data';
 import {
   AlertDialog,
@@ -37,6 +37,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Separator } from '@/components/ui/separator';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -217,6 +218,34 @@ export function AdminRequestsTable() {
                                 </div>
                             </div>
                             
+                            <Separator />
+
+                            {/* Initial Request Details */}
+                            <div className="space-y-2">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                    <PaperclipIcon />
+                                    Dados Iniciais da Solicitação
+                                </h3>
+                                <div className="space-y-4 border rounded-lg p-4 bg-background">
+                                    <div>
+                                        <p className="font-semibold text-sm">Descrição do usuário:</p>
+                                        <p className="text-sm text-muted-foreground italic mt-1">"{currentRequest.description}"</p>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-sm">Documentos Anexados:</p>
+                                        {(currentRequest.documents && currentRequest.documents.length > 0) ? (
+                                            <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
+                                                {currentRequest.documents.map((doc, i) => <li key={i}>{doc}</li>)}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground italic mt-1">Nenhum documento foi anexado na abertura do pedido.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Separator />
+
                             {/* Exigencia Section */}
                             <div className="space-y-2">
                                 <h3 className="font-semibold flex items-center gap-2">
@@ -325,5 +354,7 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
+
+    
 
     

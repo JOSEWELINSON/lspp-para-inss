@@ -71,6 +71,8 @@ export function SolicitarBeneficioForm() {
         router.push('/');
     }
   }, [router]);
+  
+  const fileRef = form.register("documents");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -95,6 +97,9 @@ export function SolicitarBeneficioForm() {
     
     const protocol = `2024${Date.now().toString().slice(-6)}`;
     const selectedBenefit = benefits.find(b => b.id === values.benefitId);
+    
+    const documentFiles = values.documents as FileList | null;
+    const documentNames = documentFiles ? Array.from(documentFiles).map(file => file.name) : [];
 
     const newRequest: UserRequest = {
         id: new Date().toISOString(),
@@ -102,6 +107,8 @@ export function SolicitarBeneficioForm() {
         benefitTitle: selectedBenefit?.title || 'Benefício Desconhecido',
         requestDate: new Date().toISOString(),
         status: 'Em análise',
+        description: values.description,
+        documents: documentNames,
         user: {
             name: user.fullName,
             cpf: user.cpf,
@@ -196,7 +203,7 @@ export function SolicitarBeneficioForm() {
                   <FormLabel>Anexar Documentos (Opcional)</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type="file" className="pl-12" multiple {...field} />
+                      <Input type="file" className="pl-12" multiple {...fileRef} />
                       <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                         <Upload className="h-5 w-5 text-gray-400" />
                       </div>
@@ -221,3 +228,5 @@ export function SolicitarBeneficioForm() {
     </Card>
   );
 }
+
+    
