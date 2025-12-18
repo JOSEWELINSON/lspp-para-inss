@@ -3,10 +3,16 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // ATENÇÃO: Regras abertas para fins de prototipagem.
-    // Permite leitura e escrita de arquivos para qualquer pessoa.
+    // Regra geral: permite leitura para qualquer pessoa
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read: if true;
+    }
+
+    // Regras para a pasta de solicitações 'requests'
+    match /requests/{requestId}/{allPaths=**} {
+      // Apenas usuários autenticados podem escrever (fazer upload)
+      // Garante que o tamanho do arquivo individual seja no máximo 20MB
+      allow write: if request.auth != null && request.resource.size < 20 * 1024 * 1024;
     }
   }
 }
