@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState, Fragment, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, UploadCloud, X } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -28,14 +28,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { type RequestStatus, type UserRequest } from '@/lib/data';
+import { type RequestStatus, type UserRequest, type Documento } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { uploadFile } from '@/firebase/storage';
+import { FormDescription, FormItem, FormControl } from '@/components/ui/form';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -57,6 +59,7 @@ export default function MeusPedidosPage() {
     const { toast } = useToast();
     const { user } = useUser();
     const firestore = useFirestore();
+    const storage = useStorage();
     const userCpf = getUserCpf();
     
     const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
@@ -66,6 +69,7 @@ export default function MeusPedidosPage() {
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
+    const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     
     const openDetailsModal = (request: UserRequest) => {
@@ -77,15 +81,37 @@ export default function MeusPedidosPage() {
         setCurrentRequest(request);
         setIsExigenciaModalOpen(true);
     };
+    
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+          const selectedFiles = Array.from(e.target.files);
+          setFilesToUpload(prevFiles => [...prevFiles, ...selectedFiles]);
+        }
+    };
+    
+    const removeFile = (index: number) => {
+        setFilesToUpload(prevFiles => prevFiles.filter((_, i) => i !== index));
+    };
+
 
     const handleCumprirExigencia = async () => {
         if (!currentRequest || !userCpf || !firestore) return;
         setIsUploading(true);
 
         try {
+            const uploadedDocuments: Documento[] = [];
+            if (filesToUpload.length > 0) {
+                const uploadPromises = filesToUpload.map(file => 
+                    uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`)
+                );
+                const results = await Promise.all(uploadPromises);
+                uploadedDocuments.push(...results);
+            }
+
             const response = {
                 text: exigenciaResponseText,
                 respondedAt: new Date().toISOString(),
+                documents: uploadedDocuments
             };
             
             const requestRef = doc(firestore, 'requests', currentRequest.id);
@@ -106,6 +132,7 @@ export default function MeusPedidosPage() {
             
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
+            setFilesToUpload([]);
             const updatedRequest = { ...currentRequest, ...payload };
             setCurrentRequest(updatedRequest);
             setIsDetailsModalOpen(true);
@@ -134,6 +161,14 @@ export default function MeusPedidosPage() {
         const prazo = addDays(date, 30);
         return format(prazo, "dd/MM/yyyy");
     };
+
+    const closeModalAndReset = () => {
+        setIsExigenciaModalOpen(false);
+        setIsDetailsModalOpen(false);
+        setExigenciaResponseText("");
+        setFilesToUpload([]);
+        setTimeout(() => setCurrentRequest(null), 300);
+    }
 
   return (
     <Fragment>
@@ -195,7 +230,7 @@ export default function MeusPedidosPage() {
 
         {/* Details Modal */}
         {currentRequest && (
-            <AlertDialog open={isDetailsModalOpen} onOpenChange={(open) => !open && setCurrentRequest(null)}>
+            <AlertDialog open={isDetailsModalOpen} onOpenChange={(open) => !open && closeModalAndReset()}>
                 <AlertDialogContent className="max-w-3xl">
                     <AlertDialogHeader>
                     <AlertDialogTitle className="flex items-center gap-2">
@@ -219,9 +254,28 @@ export default function MeusPedidosPage() {
                             </div>
                             <div>
                                 <p className="font-semibold">Status</p>
-                                <Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge>
+                                <div>
+                                    <Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge>
+                                </div>
                             </div>
                         </div>
+
+                        {currentRequest.documents && currentRequest.documents.length > 0 && (
+                            <div className="space-y-2">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                    <Paperclip />
+                                    Documentos Iniciais
+                                </h3>
+                                <div className="space-y-2">
+                                    {currentRequest.documents.map((doc, index) => (
+                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                            <LinkIcon className="h-4 w-4" />
+                                            <span className="text-sm font-medium text-primary underline">{doc.name}</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         
                         <Separator />
                         
@@ -252,6 +306,16 @@ export default function MeusPedidosPage() {
                                                 <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
                                                     <p className="text-sm">{currentRequest.exigencia.response.text}</p>
                                                 </div>
+                                                {currentRequest.exigencia.response.documents && currentRequest.exigencia.response.documents.length > 0 && (
+                                                    <div className="text-left mt-2">
+                                                        {currentRequest.exigencia.response.documents.map((doc, index) => (
+                                                             <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                                                <LinkIcon className="h-4 w-4" />
+                                                                <span className="text-sm font-medium text-primary underline">{doc.name}</span>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 <p className="text-xs text-muted-foreground">Você em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                             </div>
                                              <Avatar className="h-8 w-8">
@@ -294,7 +358,7 @@ export default function MeusPedidosPage() {
 
         {/* Respond to Exigencia Modal */}
         {currentRequest?.exigencia && (
-            <AlertDialog open={isExigenciaModalOpen} onOpenChange={setIsExigenciaModalOpen}>
+            <AlertDialog open={isExigenciaModalOpen} onOpenChange={(open) => !open && closeModalAndReset()}>
                 <AlertDialogContent className="max-w-2xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
@@ -349,6 +413,41 @@ export default function MeusPedidosPage() {
                                         disabled={isUploading}
                                     />
                                 </div>
+                                <FormItem>
+                                    <Label>Anexar Novos Documentos</Label>
+                                    <FormControl>
+                                        <div className="flex items-center justify-center w-full">
+                                            <label htmlFor="exigencia-file-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
+                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                    <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                                                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Clique para enviar</span></p>
+                                                </div>
+                                                <Input id="exigencia-file-upload" type="file" className="hidden" onChange={handleFileChange} multiple disabled={isUploading}/>
+                                            </label>
+                                        </div>
+                                    </FormControl>
+                                    <p className="text-sm text-muted-foreground">
+                                        Máx: 20MB por arquivo.
+                                    </p>
+                                </FormItem>
+                                {filesToUpload.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium">Arquivos selecionados:</h4>
+                                        <div className="grid gap-2">
+                                            {filesToUpload.map((file, index) => (
+                                                <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted">
+                                                    <div className="flex items-center gap-2">
+                                                        <FileText className="h-5 w-5 text-muted-foreground" />
+                                                        <span className="text-sm text-foreground truncate">{file.name}</span>
+                                                    </div>
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6">
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </Fragment>
                         )}
                          {currentRequest.exigencia.response && (
@@ -361,9 +460,9 @@ export default function MeusPedidosPage() {
                     </div>
                     
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => { setExigenciaResponseText(""); }}>Fechar</AlertDialogCancel>
+                        <AlertDialogCancel onClick={closeModalAndReset}>Fechar</AlertDialogCancel>
                          {!currentRequest.exigencia.response && (
-                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() || isUploading}>
+                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() && filesToUpload.length === 0 || isUploading}>
                                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                                 {isUploading ? 'Enviando...' : 'Enviar Resposta'}
                             </AlertDialogAction>

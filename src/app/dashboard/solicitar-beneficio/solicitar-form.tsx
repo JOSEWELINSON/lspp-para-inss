@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, UploadCloud, File as FileIcon, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -27,10 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { benefits, type UserRequest, type UserProfile } from "@/lib/data";
-import { useDoc, useFirestore, useUser, useMemoFirebase } from "@/firebase";
+import { benefits, type UserRequest, type UserProfile, type Documento } from "@/lib/data";
+import { useDoc, useFirestore, useUser, useMemoFirebase, useStorage } from "@/firebase";
+import { uploadFile } from "@/firebase/storage";
 
 const formSchema = z.object({
   benefitId: z.string({ required_error: "Por favor, selecione um benefício." }),
@@ -52,7 +54,10 @@ export function SolicitarBeneficioForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const userCpf = getUserCpf();
+
+  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 
   const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile } = useDoc<UserProfile>(userDocRef);
@@ -63,6 +68,17 @@ export function SolicitarBeneficioForm() {
       description: "",
     },
   });
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      setFilesToUpload(prevFiles => [...prevFiles, ...selectedFiles]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setFilesToUpload(prevFiles => prevFiles.filter((_, i) => i !== index));
+  };
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!userCpf || !userProfile) {
@@ -81,7 +97,16 @@ export function SolicitarBeneficioForm() {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
         
-        const newRequest: Omit<UserRequest, 'id' | 'documents'> = {
+        const uploadedDocuments: Documento[] = [];
+        if (filesToUpload.length > 0) {
+            const uploadPromises = filesToUpload.map(file => 
+                uploadFile(storage, file, `requests/${protocol}/${file.name}`)
+            );
+            const results = await Promise.all(uploadPromises);
+            uploadedDocuments.push(...results);
+        }
+
+        const newRequest: Omit<UserRequest, 'id'> = {
             protocol,
             benefitId: values.benefitId,
             benefitTitle: selectedBenefit?.title || 'Benefício Desconhecido',
@@ -92,7 +117,8 @@ export function SolicitarBeneficioForm() {
             user: {
                 name: userProfile.fullName,
                 cpf: userProfile.cpf,
-            }
+            },
+            documents: uploadedDocuments
         };
     
         await addDoc(collection(firestore, 'requests'), newRequest);
@@ -173,6 +199,46 @@ export function SolicitarBeneficioForm() {
                 </FormItem>
               )}
             />
+
+            <FormItem>
+                <FormLabel>Anexar Documentos</FormLabel>
+                <FormControl>
+                    <div className="flex items-center justify-center w-full">
+                        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                                <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Clique para enviar</span> ou arraste e solte</p>
+                                <p className="text-xs text-muted-foreground">PDF, PNG, JPG (MAX. 20MB por arquivo)</p>
+                            </div>
+                            <Input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} multiple disabled={isLoading}/>
+                        </label>
+                    </div>
+                </FormControl>
+                 <FormDescription>
+                    Você pode anexar laudos, comprovantes, etc.
+                </FormDescription>
+            </FormItem>
+
+            {filesToUpload.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Arquivos selecionados:</h4>
+                    <div className="grid gap-2">
+                        {filesToUpload.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted">
+                                <div className="flex items-center gap-2">
+                                    <FileIcon className="h-5 w-5 text-muted-foreground" />
+                                    <span className="text-sm text-foreground truncate">{file.name}</span>
+                                </div>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6">
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
             <Button type="submit" disabled={isLoading}>

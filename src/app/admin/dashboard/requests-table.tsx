@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, Fragment, useMemo } from 'react';
@@ -20,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip } from 'lucide-react';
 import { type RequestStatus, type UserRequest } from '@/lib/data';
 import {
   AlertDialog,
@@ -93,7 +94,8 @@ export function AdminRequestsTable() {
             const requestRef = doc(firestore, 'requests', requestId);
             const payload: Partial<UserRequest> = { status: newStatus };
             if (newStatus !== 'Exigência' && currentRequest?.exigencia) {
-                payload.exigencia = { ...currentRequest.exigencia, response: undefined };
+                // Keep exigencia history but allow new ones later if needed
+                // payload.exigencia = { ...currentRequest.exigencia, response: undefined }; 
             }
             updateDoc(requestRef, payload)
               .catch(error => {
@@ -239,6 +241,19 @@ export function AdminRequestsTable() {
                                         <p className="font-semibold text-sm">Descrição do usuário:</p>
                                         <p className="text-sm text-muted-foreground italic mt-1">"{currentRequest.description}"</p>
                                     </div>
+                                    {currentRequest.documents && currentRequest.documents.length > 0 && (
+                                        <div>
+                                            <p className="font-semibold text-sm flex items-center gap-2 mb-2"><Paperclip /> Documentos Anexados:</p>
+                                            <div className="grid gap-2">
+                                                {currentRequest.documents.map((doc, index) => (
+                                                    <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                                        <LinkIcon className="h-4 w-4" />
+                                                        <span className="text-sm font-medium text-primary underline">{doc.name}</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -290,6 +305,19 @@ export function AdminRequestsTable() {
                                                      <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
                                                         <p className="text-sm">{currentRequest.exigencia.response.text}</p>
                                                     </div>
+                                                     {currentRequest.exigencia.response.documents && currentRequest.exigencia.response.documents.length > 0 && (
+                                                        <div className="text-left mt-2">
+                                                             <p className="font-semibold text-sm flex items-center gap-2 mb-2 justify-end"><Paperclip /> Documentos da Resposta:</p>
+                                                            <div className="grid gap-2">
+                                                                {currentRequest.exigencia.response.documents.map((doc, index) => (
+                                                                    <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors justify-end">
+                                                                        <span className="text-sm font-medium text-primary underline">{doc.name}</span>
+                                                                        <LinkIcon className="h-4 w-4" />
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     <p className="text-xs text-muted-foreground">Segurado em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                                 </div>
                                                  <Avatar className="h-8 w-8">

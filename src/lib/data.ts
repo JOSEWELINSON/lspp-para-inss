@@ -51,6 +51,11 @@ export type UserProfile = {
     birthDate?: string;
 }
 
+export type Documento = {
+  name: string;
+  url: string;
+}
+
 export type UserRequest = {
   id: string;
   protocol: string;
@@ -64,12 +69,14 @@ export type UserRequest = {
     name: string;
     cpf: string;
   };
+  documents?: Documento[];
   exigencia?: {
     text: string;
     createdAt: Timestamp | string;
     response?: {
       text: string;
       respondedAt: Timestamp | string;
+      documents?: Documento[];
     }
   }
 };
