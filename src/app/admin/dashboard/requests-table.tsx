@@ -260,16 +260,19 @@ export function AdminRequestsTable() {
                                         {currentRequest.exigencia.response && (
                                              <div className="flex gap-3">
                                                 <div className="flex-1 space-y-1 text-right">
-                                                    <div className="bg-blue-100 dark:bg-blue-900/50 text-foreground rounded-lg p-3 inline-block text-left">
+                                                     <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
                                                         <p className="text-sm">{currentRequest.exigencia.response.text}</p>
-                                                        {currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0 && (
-                                                            <div className="mt-2 text-xs border-t border-blue-200 dark:border-blue-800 pt-2">
-                                                                <p className="font-semibold">Arquivos enviados:</p>
+                                                        
+                                                         <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
+                                                            <p className="font-semibold">Arquivos enviados:</p>
+                                                            {(currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0) ? (
                                                                 <ul className="list-disc pl-4">
                                                                     {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
                                                                 </ul>
-                                                            </div>
-                                                        )}
+                                                            ) : (
+                                                                <p className="italic">O usuário não anexou documentos.</p>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <p className="text-xs text-muted-foreground">Segurado em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}</p>
                                                 </div>
@@ -322,3 +325,5 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
+
+    
