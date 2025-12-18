@@ -43,6 +43,12 @@ const formSchema = z.object({
   documents: z.any().optional(),
 });
 
+function getUserCpf() {
+    if (typeof window !== 'undefined') {
+        return window.sessionStorage.getItem('userCpf');
+    }
+    return null;
+}
 
 export function SolicitarBeneficioForm() {
   const router = useRouter();
@@ -50,8 +56,9 @@ export function SolicitarBeneficioForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const userCpf = getUserCpf();
 
-  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile } = useDoc<UserProfile>(userDocRef);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -64,7 +71,7 @@ export function SolicitarBeneficioForm() {
   const fileRef = form.register("documents");
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user || !userProfile) {
+    if (!userCpf || !userProfile) {
         toast({
             variant: 'destructive',
             title: "Erro de Autenticação",
@@ -79,7 +86,7 @@ export function SolicitarBeneficioForm() {
     try {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
-        const requestId = `${user.uid}-${Date.now()}`;
+        const requestId = `${userCpf}-${Date.now()}`;
         
         const documentFiles = values.documents as FileList | null;
         const documents: Document[] = [];
@@ -99,7 +106,7 @@ export function SolicitarBeneficioForm() {
             status: 'Em análise',
             description: values.description,
             documents: documents,
-            userId: user.uid,
+            userId: userCpf, // Use CPF as the userId
             user: {
                 name: userProfile.fullName,
                 cpf: userProfile.cpf,
@@ -121,7 +128,7 @@ export function SolicitarBeneficioForm() {
         toast({
           variant: "destructive",
           title: "Erro ao Enviar Solicitação",
-          description: "Não foi possível registrar seu pedido. Verifique as permissões de armazenamento ou do banco de dados e tente novamente.",
+          description: error.message || "Não foi possível registrar seu pedido. Tente novamente.",
         });
     } finally {
         setIsLoading(false);

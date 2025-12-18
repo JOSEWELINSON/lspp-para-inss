@@ -45,12 +45,20 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
+function getUserCpf() {
+    if (typeof window !== 'undefined') {
+        return window.sessionStorage.getItem('userCpf');
+    }
+    return null;
+}
+
 export default function MeusPedidosPage() {
     const router = useRouter();
-    const { user } = useUser();
+    const { user } = useUser(); // Still useful for session checking
     const firestore = useFirestore();
+    const userCpf = getUserCpf();
     
-    const requestsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'requests'), where('userId', '==', user.uid)) : null, [user, firestore]);
+    const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
     const { data: myRequests, isLoading } = useCollection<UserRequest>(requestsQuery);
 
     const [isExigenciaModalOpen, setIsExigenciaModalOpen] = useState(false);
@@ -78,7 +86,7 @@ export default function MeusPedidosPage() {
     };
 
     const handleCumprirExigencia = async () => {
-        if (!currentRequest || !user) return;
+        if (!currentRequest || !userCpf) return;
         setIsUploading(true);
 
         try {

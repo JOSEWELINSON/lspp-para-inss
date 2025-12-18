@@ -7,8 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { signInAnonymously, type User } from "firebase/auth";
-import { doc, setDoc, getDocs, collection, query, where, limit, writeBatch, getDoc } from "firebase/firestore";
+import { signInAnonymously } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -71,23 +71,20 @@ export function UserLoginForm() {
     }
 
     try {
-        // Step 1: Query for existing user by CPF
-        const usersRef = collection(firestore, "users");
-        const q = query(usersRef, where("cpf", "==", values.cpf), limit(1));
-        const querySnapshot = await getDocs(q);
+        // Step 1: Sign in anonymously to get a secure session
+        await signInAnonymously(auth);
 
-        // Step 2: Sign in anonymously to get a stable, authenticated session UID for this login attempt.
-        const userCredential = await signInAnonymously(auth);
-        const authUser = userCredential.user;
+        // Step 2: Use CPF as the document ID
+        const userDocRef = doc(firestore, "users", values.cpf);
+        const userDoc = await getDoc(userDocRef);
 
-        if (!querySnapshot.empty) {
+        if (userDoc.exists()) {
             // User with this CPF exists
-            const existingUserDoc = querySnapshot.docs[0];
-            const existingUserData = existingUserDoc.data() as UserProfile;
+            const existingUserData = userDoc.data() as UserProfile;
 
-            // Step 3a: Validate full name
+            // Validate full name
             if (existingUserData.fullName.toLowerCase() !== values.fullName.toLowerCase()) {
-                await authUser.delete(); // Clean up the newly created anonymous user
+                await auth.signOut(); // Sign out the anonymous user
                 toast({
                     variant: "destructive",
                     title: "Acesso Negado",
@@ -97,34 +94,16 @@ export function UserLoginForm() {
                 return;
             }
             
-            // Step 3b: User is validated. Now, ensure the current auth UID is linked to the profile.
-            // If the current auth UID is different from the one stored, we "migrate" the profile.
-            if (existingUserDoc.id !== authUser.uid) {
-                const batch = writeBatch(firestore);
-                
-                const oldDocRef = doc(firestore, 'users', existingUserDoc.id);
-                const newDocRef = doc(firestore, 'users', authUser.uid);
-                
-                const newProfileData: UserProfile = {
-                    ...existingUserData, // copy all data from the old profile
-                    id: authUser.uid,     // update the ID to the new auth UID
-                };
-                
-                batch.set(newDocRef, newProfileData); // Create the new document with the new UID
-                batch.delete(oldDocRef);             // Delete the old document
-                
-                await batch.commit();
-            }
-            
+            // Name matches, proceed to dashboard
             toast({
                 title: "Bem-vindo de volta!",
                 description: "Acessando seu painel de benefícios.",
             });
 
         } else {
-            // Step 4: New user, create a profile using the new anonymous user's UID as the document ID
+            // New user, create a profile using CPF as the ID
             const newUserProfile: UserProfile = {
-                id: authUser.uid,
+                id: values.cpf, // Use CPF as the ID
                 cpf: values.cpf,
                 fullName: values.fullName,
                 email: "",
@@ -132,13 +111,17 @@ export function UserLoginForm() {
                 address: "",
                 birthDate: ""
             };
-            const userRef = doc(firestore, "users", authUser.uid);
-            await setDoc(userRef, newUserProfile);
+            await setDoc(userDocRef, newUserProfile);
             
             toast({
                 title: "Cadastro realizado com sucesso!",
                 description: "Redirecionando para o seu painel.",
             });
+        }
+        
+        // Store CPF in session storage to be used by other pages
+        if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem('userCpf', values.cpf);
         }
 
         router.push("/dashboard");

@@ -32,25 +32,27 @@ import { doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { type UserProfile } from '@/lib/data';
 
-const navItems = [
-  { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
-  { href: '/dashboard/beneficios', label: 'Benefícios', icon: HeartHandshake },
-  { href: '/dashboard/solicitar-beneficio', label: 'Solicitar', icon: FileText },
-  { href: '/dashboard/meus-pedidos', label: 'Meus Pedidos', icon: Paperclip },
-  { href: '/dashboard/assistente-virtual', label: 'Assistente Virtual', icon: BotMessageSquare },
-  { href: '/dashboard/perfil', label: 'Meu Perfil', icon: User },
-];
+function getUserCpf() {
+    if (typeof window !== 'undefined') {
+        return window.sessionStorage.getItem('userCpf');
+    }
+    return null;
+}
 
 function UserMenu() {
     const router = useRouter();
     const auth = useAuth();
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
+    const userCpf = getUserCpf();
 
-    const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+    const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
     const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
     const handleLogout = async () => {
+        if (typeof window !== 'undefined') {
+            window.sessionStorage.removeItem('userCpf');
+        }
         await auth.signOut();
         router.push('/');
     };
@@ -60,7 +62,8 @@ function UserMenu() {
     }
 
     if (!user || !userProfile) {
-        return null;
+        // This might happen briefly on load, or if the CPF isn't found
+        return null; 
     }
 
     const nameInitial = userProfile.fullName ? userProfile.fullName.charAt(0).toUpperCase() : '?';
@@ -116,14 +119,20 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
-  
+  const [userCpf, setUserCpf] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!isUserLoading && !user) {
-        router.push('/');
+    // This check ensures we run this logic only on the client
+    if (typeof window !== 'undefined') {
+      const storedCpf = window.sessionStorage.getItem('userCpf');
+      setUserCpf(storedCpf);
+      if (!isUserLoading && (!user || !storedCpf)) {
+          router.push('/');
+      }
     }
   }, [user, isUserLoading, router]);
 
-  if(isUserLoading || !user) {
+  if(isUserLoading || !user || !userCpf) {
     return (
         <div className="flex min-h-screen w-full items-center justify-center bg-background">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -177,3 +186,12 @@ export default function DashboardLayout({
     </div>
   );
 }
+
+const navItems = [
+  { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  { href: '/dashboard/beneficios', label: 'Benefícios', icon: HeartHandshake },
+  { href: '/dashboard/solicitar-beneficio', label: 'Solicitar', icon: FileText },
+  { href: '/dashboard/meus-pedidos', label: 'Meus Pedidos', icon: Paperclip },
+  { href: '/dashboard/assistente-virtual', label: 'Assistente Virtual', icon: BotMessageSquare },
+  { href: '/dashboard/perfil', label: 'Meu Perfil', icon: User },
+];

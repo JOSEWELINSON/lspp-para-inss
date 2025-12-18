@@ -18,16 +18,25 @@ import { type UserProfile } from '@/lib/data';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
+function getUserCpf() {
+    if (typeof window !== 'undefined') {
+        return window.sessionStorage.getItem('userCpf');
+    }
+    return null;
+}
+
 export default function PerfilPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const userCpf = getUserCpf();
 
-  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -49,9 +58,17 @@ export default function PerfilPage() {
 
   const handleSave = async () => {
     if (!userDocRef) return;
-
+    setIsSaving(true);
     try {
-        await updateDoc(userDocRef, formData);
+        // We shouldn't allow changing the name or CPF from the profile page
+        // as they are used for login identification.
+        const dataToUpdate: Partial<UserProfile> = {
+            birthDate: formData.birthDate,
+            phone: formData.phone,
+            email: formData.email,
+            address: formData.address,
+        };
+        await updateDoc(userDocRef, dataToUpdate);
         toast({
             title: "Perfil Atualizado!",
             description: "Suas informações foram salvas com sucesso."
@@ -62,12 +79,14 @@ export default function PerfilPage() {
             title: "Erro ao Salvar",
             description: "Não foi possível salvar suas informações."
         });
+    } finally {
+        setIsSaving(false);
     }
   };
   
   if (isUserLoading || isProfileLoading) {
     return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-background">
+        <div className="flex min-h-[calc(100vh-10rem)] w-full items-center justify-center bg-background">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
     );
@@ -89,7 +108,7 @@ export default function PerfilPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nome Completo</Label>
-                <Input id="fullName" value={formData.fullName || ''} onChange={handleInputChange} />
+                <Input id="fullName" value={formData.fullName || ''} disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cpf">CPF</Label>
@@ -117,7 +136,10 @@ export default function PerfilPage() {
           </form>
         </CardContent>
         <CardFooter className="border-t px-6 py-4">
-          <Button onClick={handleSave}>Salvar Alterações</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Alterações
+          </Button>
         </CardFooter>
       </Card>
     </div>

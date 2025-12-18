@@ -26,7 +26,7 @@ import {
 import type { RequestStatus, UserRequest, UserProfile } from '@/lib/data';
 import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -36,15 +36,22 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
+function getUserCpf() {
+    if (typeof window !== 'undefined') {
+        return window.sessionStorage.getItem('userCpf');
+    }
+    return null;
+}
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const userCpf = getUserCpf();
 
-  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
   
-  const requestsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'requests'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
   const { data: allRequests, isLoading: areRequestsLoading } = useCollection<UserRequest>(requestsQuery);
 
   const myRequests = useMemo(() => {
