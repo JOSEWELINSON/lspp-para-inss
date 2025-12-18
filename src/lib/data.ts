@@ -79,7 +79,8 @@ export type UserRequest = {
       respondedAt: Timestamp | string;
       documents?: Documento[];
     }
-  }
+  },
+  motivoIndeferimento?: string;
 };
 
 export const mockUser = {

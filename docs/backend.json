@@ -143,6 +143,10 @@
                     }
                 }
             }
+        },
+        "motivoIndeferimento": {
+            "type": "string",
+            "description": "Reason for denial of the benefit application."
         }
       },
       "required": [

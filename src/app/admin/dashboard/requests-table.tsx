@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, HeartHandshake } from 'lucide-react';
 import { type RequestStatus, type UserRequest, type Documento } from '@/lib/data';
 import {
   AlertDialog,
@@ -118,11 +118,11 @@ export function AdminRequestsTable() {
     const requestsCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'requests') : null, [firestore]);
     const { data: allRequests, isLoading } = useCollection<UserRequest>(requestsCollectionRef);
     
-    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-    const [isExigenciaSubmitting, setIsExigenciaSubmitting] = useState(false);
+    const [modalState, setModalState] = useState<'details' | 'exigencia' | 'indeferimento' | null>(null);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaText, setExigenciaText] = useState("");
-    
+    const [indeferimentoMotivo, setIndeferimentoMotivo] = useState("");
+
     const sortedRequests = useMemo(() => {
         if (!allRequests) return [];
         return [...allRequests].sort((a, b) => {
@@ -141,29 +141,31 @@ export function AdminRequestsTable() {
     
     const openDetailsModal = (request: UserRequest) => {
         setCurrentRequest(request);
-        setIsDetailsModalOpen(true);
+        setModalState('details');
     };
 
     const handleStatusChange = async (requestId: string, newStatus: RequestStatus) => {
         if (!firestore || !currentRequest) return;
-
-        const updatedRequestData = { ...currentRequest, status: newStatus };
-
+        
         if (newStatus === 'Exigência') {
-             // Close main modal and open exigencia modal without changing status yet
-             setIsDetailsModalOpen(false);
-             setIsExigenciaSubmitting(true);
-        } else {
-            const requestRef = doc(firestore, 'requests', requestId);
-            const payload: Partial<UserRequest> = { status: newStatus };
-            
-            updateDoc(requestRef, payload)
-              .catch(error => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: requestRef.path, operation: 'update', requestResourceData: payload }));
-              });
-            // Optimistically update the local state
-            setCurrentRequest(updatedRequestData);
+             setModalState('exigencia');
+             return;
         }
+        
+        if (newStatus === 'Indeferido') {
+             setModalState('indeferimento');
+             return;
+        }
+        
+        const requestRef = doc(firestore, 'requests', requestId);
+        const payload: Partial<UserRequest> = { status: newStatus };
+        
+        updateDoc(requestRef, payload)
+          .catch(error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: requestRef.path, operation: 'update', requestResourceData: payload }));
+          });
+          
+        setCurrentRequest(prev => prev ? { ...prev, status: newStatus } : null);
     };
     
     const handleExigenciaSubmit = async () => {
@@ -185,17 +187,34 @@ export function AdminRequestsTable() {
             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: requestRef.path, operation: 'update', requestResourceData: payload }));
           });
         
-        // Optimistically update the local state and close modals
-        setCurrentRequest({ ...currentRequest, ...payload });
-        setIsExigenciaSubmitting(false);
+        setCurrentRequest(prev => prev ? { ...prev, ...payload } : null);
+        setModalState('details');
         setExigenciaText("");
-        setIsDetailsModalOpen(true); // Re-open details modal
+    };
+
+    const handleIndeferimentoSubmit = async () => {
+        if (!currentRequest || !indeferimentoMotivo || !firestore) return;
+
+        const requestRef = doc(firestore, 'requests', currentRequest.id);
+        const payload = {
+            status: 'Indeferido' as RequestStatus,
+            motivoIndeferimento: indeferimentoMotivo
+        };
+
+        updateDoc(requestRef, payload)
+          .catch(error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: requestRef.path, operation: 'update', requestResourceData: payload }));
+          });
+
+        setCurrentRequest(prev => prev ? { ...prev, ...payload } : null);
+        setModalState('details');
+        setIndeferimentoMotivo("");
     };
 
     const closeModal = () => {
-        setIsDetailsModalOpen(false);
-        setIsExigenciaSubmitting(false);
+        setModalState(null);
         setExigenciaText("");
+        setIndeferimentoMotivo("");
         setTimeout(() => setCurrentRequest(null), 300);
     }
     
@@ -221,9 +240,10 @@ export function AdminRequestsTable() {
             </Tabs>
             
             {currentRequest && (
-                <AlertDialog open={isDetailsModalOpen || isExigenciaSubmitting} onOpenChange={(open) => !open && closeModal()}>
-                    {isExigenciaSubmitting ? (
-                        <AlertDialogContent>
+                <AlertDialog open={!!modalState} onOpenChange={(open) => !open && closeModal()}>
+                    
+                    {modalState === 'exigencia' ? (
+                         <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Cadastrar Nova Exigência</AlertDialogTitle>
                                 <AlertDialogDescription>Descreva a pendência que o segurado precisa resolver.</AlertDialogDescription>
@@ -241,8 +261,31 @@ export function AdminRequestsTable() {
                                 </div>
                             </div>
                             <AlertDialogFooter>
-                                <Button variant="ghost" onClick={() => { setIsExigenciaSubmitting(false); setIsDetailsModalOpen(true); }}>Cancelar</Button>
+                                <Button variant="ghost" onClick={() => { setModalState('details'); setExigenciaText(""); }}>Cancelar</Button>
                                 <Button onClick={handleExigenciaSubmit} disabled={!exigenciaText.trim()}>Enviar Exigência</Button>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    ) : modalState === 'indeferimento' ? (
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Indeferir Solicitação</AlertDialogTitle>
+                                <AlertDialogDescription>Descreva o motivo pelo qual esta solicitação está sendo indeferida.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="indeferimento-motivo">Motivo do Indeferimento</Label>
+                                    <Textarea
+                                        id="indeferimento-motivo"
+                                        placeholder="Ex: O segurado não cumpriu o tempo mínimo de contribuição exigido..."
+                                        value={indeferimentoMotivo}
+                                        onChange={(e) => setIndeferimentoMotivo(e.target.value)}
+                                        rows={5}
+                                    />
+                                </div>
+                            </div>
+                            <AlertDialogFooter>
+                                <Button variant="ghost" onClick={() => { setModalState('details'); setIndeferimentoMotivo(""); }}>Cancelar</Button>
+                                <Button variant="destructive" onClick={handleIndeferimentoSubmit} disabled={!indeferimentoMotivo.trim()}>Confirmar Indeferimento</Button>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     ) : (
@@ -279,6 +322,17 @@ export function AdminRequestsTable() {
                                 </div>
                                 
                                 <Separator />
+                                
+                                <div className="space-y-2">
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <HeartHandshake />
+                                        Benefício Solicitado
+                                    </h3>
+                                    <div className="border rounded-lg p-4 bg-background">
+                                        <p className="font-semibold">{currentRequest.benefitTitle}</p>
+                                    </div>
+                                </div>
+
 
                                 {/* Initial Request Details */}
                                 <div className="space-y-2">

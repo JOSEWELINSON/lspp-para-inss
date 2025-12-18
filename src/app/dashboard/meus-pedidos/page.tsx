@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, Fragment, ChangeEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, X } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, X, Info } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import imageCompression from 'browser-image-compression';
@@ -61,11 +61,8 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
-// Firestore has a 1MB limit for documents. Base64 encoding adds about 33% overhead.
-// So, we aim for a file size that, when encoded, stays under this limit.
-const FIRESTORE_SIZE_LIMIT = 1048576; // 1 MiB in bytes
-const MAX_DATA_URL_SIZE = FIRESTORE_SIZE_LIMIT;
-const MAX_RAW_FILE_SIZE_MB = 0.5; // Target 0.5MB for raw images to be safe after compression and encoding
+const MAX_RAW_FILE_SIZE_MB = 0.5;
+const MAX_DATA_URL_SIZE = 1048576 * 0.9;
 
 export default function MeusPedidosPage() {
     const router = useRouter();
@@ -116,7 +113,7 @@ export default function MeusPedidosPage() {
                 if (file.type.startsWith('image/')) {
                     const options = {
                         maxSizeMB: MAX_RAW_FILE_SIZE_MB,
-                        maxWidthOrHeight: 1920,
+                        maxWidthOrHeight: 1024,
                         useWebWorker: true,
                     };
                     fileToProcess = await imageCompression(file, options);
@@ -128,7 +125,7 @@ export default function MeusPedidosPage() {
                     toast({
                         variant: "destructive",
                         title: "Arquivo Muito Grande",
-                        description: `O arquivo "${file.name}" é muito grande para ser enviado, mesmo após a compressão. Tente uma imagem menor ou com menos detalhes.`,
+                        description: `O arquivo "${file.name}" é muito grande para ser enviado, mesmo após a compressão. Tente uma imagem menor ou um PDF com menos páginas.`,
                     });
                     continue; // Skip this file
                 }
@@ -140,6 +137,7 @@ export default function MeusPedidosPage() {
                 });
 
             } catch (error) {
+                console.error(error);
                 toast({
                     variant: "destructive",
                     title: "Falha no Processamento",
@@ -327,6 +325,19 @@ export default function MeusPedidosPage() {
                                 </div>
                             </div>
                         </div>
+                        
+                        {currentRequest.status === 'Indeferido' && currentRequest.motivoIndeferimento && (
+                           <div className="space-y-2">
+                                <h3 className="font-semibold flex items-center gap-2 text-destructive">
+                                    <Info />
+                                    Motivo do Indeferimento
+                                </h3>
+                                <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded-r-lg">
+                                    <p className="text-sm text-destructive-foreground/90 italic">"{currentRequest.motivoIndeferimento}"</p>
+                                </div>
+                            </div>
+                        )}
+
 
                         {currentRequest.documents && currentRequest.documents.length > 0 && (
                             <div className="space-y-2">

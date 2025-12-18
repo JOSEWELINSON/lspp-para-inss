@@ -15,7 +15,6 @@ export default function ViewDocumentPage() {
             if (docString) {
                 const doc = JSON.parse(docString);
                 setDocument(doc);
-                document.title = doc.name || "Visualizar Documento";
             }
         } catch (error) {
             console.error("Failed to parse document from sessionStorage", error);
@@ -23,11 +22,16 @@ export default function ViewDocumentPage() {
             setIsLoading(false);
         }
 
-        // Optional: Clean up sessionStorage after reading
         return () => {
              sessionStorage.removeItem('documentToView');
         };
     }, []);
+
+    useEffect(() => {
+        if (document) {
+            window.document.title = document.name || "Visualizar Documento";
+        }
+    }, [document]);
 
     if (isLoading) {
         return (
