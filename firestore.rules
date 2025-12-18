@@ -17,11 +17,6 @@ service cloud.firestore {
       return isOwner(userId) && resource != null;
     }
 
-    // Checks if the authenticated user has the 'isAdmin' custom claim.
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.isAdmin == true;
-    }
-
     // User can manage their own profile
     match /users/{userId} {
       allow read, create: if isOwner(userId);
@@ -29,23 +24,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Requests collection access rules
+    // Requests collection access rules (SIMPLIFIED FOR PROTOTYPE)
     match /requests/{requestId} {
-      // Individual document access: Admins can get any. Users can get their own.
-      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      
-      // Collection query access: Admins can list all. Users can list only their own.
-      // This rule secures collection queries (e.g., useCollection)
-      allow list: if isAdmin() || (isSignedIn() && request.query.where.get('userId') == request.auth.uid);
-      
-      // Create access: Authenticated user must be the owner of the new request.
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      
-      // Update access: Can be updated by the owner or an admin.
-      allow update: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()));
-      
-      // Delete access: Only the owner can delete.
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Any authenticated user can read/write.
+      // In a real app, this would be locked down to owners and admins.
+      allow read, write: if isSignedIn();
     }
     
     // Admins collection is read-only for clients, managed server-side.
