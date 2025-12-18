@@ -30,14 +30,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Requests can be created by any authenticated user.
-    // An owner can read/update their own requests.
-    // An admin can read all requests.
+    // Requests collection access rules
     match /requests/{requestId} {
-      allow get, list: if isOwner(request.resource.data.userId) || isAdmin();
+      // Individual document access: Admins can get any. Users can get their own.
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      // Collection query access: Admins can list all. Users can list only their own.
+      allow list: if isAdmin() || (isSignedIn() && request.query.where.get('userId') == request.auth.uid);
+      
+      // Create access: Authenticated user must be the owner of the new request.
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if (isOwner(resource.data.userId) || isAdmin());
-      allow delete: if isOwner(resource.data.userId);
+      
+      // Update access: Can be updated by the owner or an admin.
+      allow update: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()));
+      
+      // Delete access: Only the owner can delete.
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
     
     // Admins collection is read-only for clients, managed server-side.
