@@ -33,7 +33,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { collection, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { uploadFile } from '@/firebase/storage';
@@ -71,7 +70,6 @@ export default function MeusPedidosPage() {
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
     const [exigenciaFiles, setExigenciaFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     
     const openDetailsModal = (request: UserRequest) => {
         setCurrentRequest(request);
@@ -93,19 +91,13 @@ export default function MeusPedidosPage() {
     const handleCumprirExigencia = async () => {
         if (!currentRequest || !userCpf || !storage) return;
         setIsUploading(true);
-        setUploadProgress(0);
 
         try {
             let documents: Document[] = [];
             if (exigenciaFiles.length > 0) {
-                const uploadPromises = exigenciaFiles.map(file => 
-                    uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`, (progress) => {
-                         // For simplicity, we'll show the progress of the first file.
-                         // A more complex UI could show progress for each file.
-                         if(file === exigenciaFiles[0]) {
-                            setUploadProgress(progress);
-                         }
-                    })
+                const filesToUpload = Array.from(exigenciaFiles);
+                const uploadPromises = filesToUpload.map(file => 
+                    uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`)
                 );
                 documents = await Promise.all(uploadPromises);
             }
@@ -148,7 +140,6 @@ export default function MeusPedidosPage() {
             });
         } finally {
             setIsUploading(false);
-            setUploadProgress(null);
         }
     };
     
@@ -426,12 +417,6 @@ export default function MeusPedidosPage() {
                                         </div>
                                     )}
                                 </div>
-                                {uploadProgress !== null && (
-                                    <div className="space-y-2">
-                                        <Progress value={uploadProgress} className="w-full" />
-                                        <p className="text-sm text-center text-muted-foreground">{Math.round(uploadProgress)}%</p>
-                                    </div>
-                                )}
                             </Fragment>
                         )}
                          {currentRequest.exigencia.response && (
@@ -458,3 +443,5 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
+
+    

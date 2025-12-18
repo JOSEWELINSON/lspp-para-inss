@@ -1,47 +1,38 @@
+
 'use client';
-import { ref, uploadBytesResumable, getDownloadURL, FirebaseStorage, UploadTaskSnapshot } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, FirebaseStorage } from 'firebase/storage';
 
 /**
- * Uploads a file to Firebase Storage with progress tracking.
+ * Uploads a file to Firebase Storage.
  *
  * @param storage The FirebaseStorage instance.
  * @param file The file to upload.
  * @param path The path where the file should be stored in Firebase Storage.
- * @param onProgress A callback function that receives the upload progress percentage.
- * @returns A promise that resolves with the download URL of the uploaded file.
+ * @returns A promise that resolves with an object containing the file name and download URL.
  */
-export const uploadFile = (
+export const uploadFile = async (
   storage: FirebaseStorage, 
   file: File, 
-  path: string,
-  onProgress: (progress: number) => void
-): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    if (!storage) {
-        reject(new Error("Firebase Storage service is not available."));
-        return;
-    }
+  path: string
+): Promise<{ name: string, url: string }> => {
+  if (!storage) {
+    throw new Error("Firebase Storage service is not available.");
+  }
 
+  try {
     const storageRef = ref(storage, path);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-
-    uploadTask.on('state_changed',
-      (snapshot: UploadTaskSnapshot) => {
-        // Observe state change events such as progress, pause, and resume
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress(progress);
-      }, 
-      (error) => {
-        // Handle unsuccessful uploads
-        console.error("Upload failed", error);
-        reject(error);
-      }, 
-      () => {
-        // Handle successful uploads on complete
-        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-          resolve(downloadURL);
-        }).catch(reject);
-      }
-    );
-  });
+    
+    // Upload the file
+    const snapshot = await uploadBytes(storageRef, file);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return { name: file.name, url: downloadURL };
+  } catch (error) {
+    console.error("Upload failed", error);
+    throw error;
+  }
 };
+
+    

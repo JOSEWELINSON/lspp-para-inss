@@ -29,7 +29,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { benefits, type UserRequest, type Document, type UserProfile } from "@/lib/data";
 import { useDoc, useFirestore, useUser, useMemoFirebase, useStorage } from "@/firebase";
@@ -55,7 +54,6 @@ export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
@@ -85,7 +83,6 @@ export function SolicitarBeneficioForm() {
     }
 
     setIsUploading(true);
-    setUploadProgress(0);
     
     try {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
@@ -98,14 +95,7 @@ export function SolicitarBeneficioForm() {
         if (documentFiles && documentFiles.length > 0) {
             const filesToUpload = Array.from(documentFiles);
             const uploadPromises = filesToUpload.map(file => 
-                uploadFile(storage, file, `requests/${requestId}/${file.name}`, (progress) => {
-                    // For multiple files, we can average the progress.
-                    // This is a simplified approach. A more complex UI might show individual progresses.
-                    // Let's just track the first file for simplicity for now.
-                    if (file === filesToUpload[0]) {
-                        setUploadProgress(progress);
-                    }
-                })
+                uploadFile(storage, file, `requests/${requestId}/${file.name}`)
             );
             documents = await Promise.all(uploadPromises);
         }
@@ -143,7 +133,6 @@ export function SolicitarBeneficioForm() {
         });
     } finally {
         setIsUploading(false);
-        setUploadProgress(null);
     }
   }
 
@@ -225,12 +214,6 @@ export function SolicitarBeneficioForm() {
                 </FormItem>
               )}
             />
-             {uploadProgress !== null && (
-                <div className="space-y-2">
-                    <Progress value={uploadProgress} className="w-full" />
-                    <p className="text-sm text-center text-muted-foreground">Enviando arquivos... {Math.round(uploadProgress)}%</p>
-                </div>
-            )}
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
             <Button type="submit" disabled={isLoading}>
@@ -243,3 +226,5 @@ export function SolicitarBeneficioForm() {
     </Card>
   );
 }
+
+    
