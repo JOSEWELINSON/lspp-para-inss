@@ -33,7 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { collection, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { uploadFile } from '@/firebase/storage';
 
@@ -56,6 +56,7 @@ export default function MeusPedidosPage() {
     const router = useRouter();
     const { user } = useUser(); // Still useful for session checking
     const firestore = useFirestore();
+    const storage = useStorage();
     const userCpf = getUserCpf();
     
     const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
@@ -86,13 +87,13 @@ export default function MeusPedidosPage() {
     };
 
     const handleCumprirExigencia = async () => {
-        if (!currentRequest || !userCpf) return;
+        if (!currentRequest || !userCpf || !storage) return;
         setIsUploading(true);
 
         try {
             const documents: Document[] = [];
             for (const file of exigenciaFiles) {
-                const downloadUrl = await uploadFile(file, `requests/${currentRequest.id}/${file.name}`);
+                const downloadUrl = await uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`);
                 documents.push({ name: file.name, url: downloadUrl });
             }
 
