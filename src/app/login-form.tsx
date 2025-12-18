@@ -8,7 +8,7 @@ import { z } from "zod";
 import Link from "next/link";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { signInAnonymously } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDocs, collection, query, where, limit } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -57,56 +57,63 @@ export function UserLoginForm() {
     form.setValue("cpf", value);
   };
 
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     
     try {
-      const userCredential = await signInAnonymously(auth);
-      const user = userCredential.user;
+        const usersRef = collection(firestore, "users");
+        const q = query(usersRef, where("cpf", "==", values.cpf), limit(1));
+        const querySnapshot = await getDocs(q);
 
-      if (user) {
-        const userRef = doc(firestore, "users", user.uid);
-        const userDoc = await getDoc(userRef);
+        const userCredential = await signInAnonymously(auth);
+        const authUser = userCredential.user;
 
-        if (userDoc.exists()) {
-          // User exists, check if name matches
-          const userData = userDoc.data() as UserProfile;
-          if (userData.fullName.toLowerCase() !== values.fullName.toLowerCase() || userData.cpf !== values.cpf) {
+        if (!querySnapshot.empty) {
+            // User with this CPF exists
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data() as UserProfile;
+
+            if (userData.fullName.toLowerCase() !== values.fullName.toLowerCase()) {
+                await auth.signOut(); // Sign out the anonymous user
+                toast({
+                    variant: "destructive",
+                    title: "Acesso Negado",
+                    description: "O nome não corresponde ao CPF cadastrado.",
+                });
+                setIsLoading(false);
+                return;
+            }
+            // If name matches, we can proceed. The anonymous user will be used for the session.
+            // We can optionally update the UID in the document if we want to keep it consistent,
+            // but for this prototype, just logging in is enough.
             toast({
-                variant: "destructive",
-                title: "Acesso Negado",
-                description: "Os dados não correspondem ao usuário autenticado.",
+                title: "Bem-vindo de volta!",
+                description: "Acessando seu painel de benefícios.",
             });
-            await auth.signOut();
-            setIsLoading(false);
-            return;
-          }
-           toast({
-            title: "Bem-vindo de volta!",
-            description: "Acessando seu painel de benefícios.",
-          });
+
         } else {
-          // New user, create profile
-          const newUserProfile: UserProfile = {
-            id: user.uid,
-            cpf: values.cpf,
-            fullName: values.fullName,
-          };
-          await setDoc(userRef, newUserProfile);
-          toast({
-            title: "Cadastro realizado com sucesso!",
-            description: "Redirecionando para o seu painel.",
-          });
+            // New user, create profile with the new anonymous UID
+            const newUserProfile: UserProfile = {
+                id: authUser.uid, // Use the new anonymous UID
+                cpf: values.cpf,
+                fullName: values.fullName,
+            };
+            const userRef = doc(firestore, "users", authUser.uid);
+            await setDoc(userRef, newUserProfile);
+            toast({
+                title: "Cadastro realizado com sucesso!",
+                description: "Redirecionando para o seu painel.",
+            });
         }
+
         router.push("/dashboard");
-      }
+
     } catch (error: any) {
-       console.error("Firebase Authentication Error: ", error);
+       console.error("Login/Signup Error: ", error);
        toast({
         variant: "destructive",
-        title: "Erro de Autenticação",
-        description: error.message || "Não foi possível fazer login. Tente novamente.",
+        title: "Erro",
+        description: error.message || "Não foi possível processar seu acesso. Tente novamente.",
       });
        setIsLoading(false);
     }
