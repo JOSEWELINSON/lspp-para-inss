@@ -80,19 +80,34 @@ export function AdminRequestsTable() {
     }, [allRequests, showAll]);
 
 
-    const updateRequestsInStorage = (updatedRequests: UserRequest[]) => {
+    const updateRequestsInStorage = (updatedRequests: UserRequest[], fullRequestForSession?: UserRequest) => {
         try {
             const appDataRaw = localStorage.getItem('appData');
             const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
             appData.requests = updatedRequests;
             localStorage.setItem('appData', JSON.stringify(appData));
+
+             if (fullRequestForSession) {
+                sessionStorage.setItem(fullRequestForSession.id, JSON.stringify(fullRequestForSession));
+            }
+
         } catch (error) {
             console.error("Failed to save request status", error);
         }
     };
     
     const openDetailsModal = (request: UserRequest) => {
-        setCurrentRequest(request);
+        // Try to get the full request from session storage, which might contain data URLs
+        try {
+            const sessionRequestRaw = sessionStorage.getItem(request.id);
+            if (sessionRequestRaw) {
+                setCurrentRequest(JSON.parse(sessionRequestRaw));
+            } else {
+                setCurrentRequest(request);
+            }
+        } catch {
+             setCurrentRequest(request);
+        }
         setIsDetailsModalOpen(true);
     };
 
@@ -113,24 +128,31 @@ export function AdminRequestsTable() {
     const handleExigenciaSubmit = () => {
         if (!currentRequest || !exigenciaText) return;
 
+        const exigenciaData = {
+            text: exigenciaText,
+            createdAt: new Date().toISOString()
+        };
+
+        const fullRequestForSession = {
+            ...currentRequest,
+            status: 'Exigência' as RequestStatus,
+            exigencia: exigenciaData,
+        };
+
         const updatedRequests = allRequests.map(req => 
             req.id === currentRequest.id 
             ? { 
                 ...req, 
                 status: 'Exigência' as RequestStatus,
-                exigencia: {
-                    text: exigenciaText,
-                    createdAt: new Date().toISOString()
-                }
+                exigencia: exigenciaData,
               } 
             : req
         );
 
         setAllRequests(updatedRequests);
-        updateRequestsInStorage(updatedRequests);
+        updateRequestsInStorage(updatedRequests, fullRequestForSession);
         
-        const updatedCurrentRequest = updatedRequests.find(req => req.id === currentRequest.id) || null;
-        setCurrentRequest(updatedCurrentRequest);
+        setCurrentRequest(fullRequestForSession);
 
         // Reset and close sub-modal
         setIsExigenciaSubmitting(false);
@@ -236,7 +258,11 @@ export function AdminRequestsTable() {
                                         {(currentRequest.documents && currentRequest.documents.length > 0) ? (
                                             <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
                                                 {currentRequest.documents.map((doc, i) => (
-                                                    <li key={i}>{doc.name}</li>
+                                                    <li key={i}>
+                                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                                                            {doc.name}
+                                                        </a>
+                                                    </li>
                                                 ))}
                                             </ul>
                                         ) : (
@@ -299,7 +325,11 @@ export function AdminRequestsTable() {
                                                             {(currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0) ? (
                                                                 <ul className="list-disc pl-4">
                                                                     {currentRequest.exigencia.response.files.map((file, i) => (
-                                                                        <li key={i}>{file.name}</li>
+                                                                        <li key={i}>
+                                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">
+                                                                                {file.name}
+                                                                            </a>
+                                                                        </li>
                                                                     ))}
                                                                 </ul>
                                                             ) : (
@@ -358,3 +388,5 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
+
+    

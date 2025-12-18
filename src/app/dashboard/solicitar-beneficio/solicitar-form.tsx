@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -42,6 +43,16 @@ type User = {
     fullName: string;
     cpf: string;
 }
+
+const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
 
 export function SolicitarBeneficioForm() {
   const router = useRouter();
@@ -102,9 +113,17 @@ export function SolicitarBeneficioForm() {
 
     if (documentFiles) {
         for (const file of Array.from(documentFiles)) {
-             // We no longer convert to base64 to avoid storage quota errors.
-             // We will just store the file name. The URL will be a placeholder.
-            documents.push({ name: file.name, url: "" });
+             try {
+                const url = await fileToDataURL(file);
+                documents.push({ name: file.name, url: url });
+            } catch (error) {
+                console.error("Error converting file to Data URL", error);
+                toast({
+                    variant: "destructive",
+                    title: "Erro ao Processar Arquivo",
+                    description: `Não foi possível processar o arquivo ${file.name}.`,
+                });
+            }
         }
     }
 
@@ -126,8 +145,16 @@ export function SolicitarBeneficioForm() {
         const appDataRaw = localStorage.getItem('appData');
         const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
         
-        appData.requests.unshift(newRequest);
+        // Remove 'url' before saving to localStorage to avoid QuotaExceededError
+        const requestToStore = { ...newRequest, documents: newRequest.documents.map(({name}) => ({name, url: ''})) };
+        appData.requests.unshift(requestToStore);
+
         localStorage.setItem('appData', JSON.stringify(appData));
+
+        // For this session, keep the full request with data urls in a separate session storage
+        // So the admin can view it if they are on the "same machine" for this prototype
+        sessionStorage.setItem(newRequest.id, JSON.stringify(newRequest));
+
 
         toast({
           title: "Solicitação Enviada com Sucesso!",
@@ -238,3 +265,5 @@ export function SolicitarBeneficioForm() {
     </Card>
   );
 }
+
+    

@@ -42,6 +42,15 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
+const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
 
 export default function MeusPedidosPage() {
     const router = useRouter();
@@ -76,7 +85,17 @@ export default function MeusPedidosPage() {
     };
     
     const openDetailsModal = (request: UserRequest) => {
-        setCurrentRequest(request);
+        // Try to get the full request from session storage, which might contain data URLs
+        try {
+            const sessionRequestRaw = sessionStorage.getItem(request.id);
+            if (sessionRequestRaw) {
+                setCurrentRequest(JSON.parse(sessionRequestRaw));
+            } else {
+                setCurrentRequest(request);
+            }
+        } catch {
+             setCurrentRequest(request);
+        }
         setIsDetailsModalOpen(true);
     };
 
@@ -103,23 +122,39 @@ export default function MeusPedidosPage() {
             
             const documents: Document[] = [];
             for (const file of exigenciaFiles) {
-                // We no longer convert to base64 to avoid storage quota errors.
-                // We will just store the file name. The URL will be a placeholder.
-                documents.push({ name: file.name, url: "" });
+                const url = await fileToDataURL(file);
+                documents.push({ name: file.name, url: url });
             }
+
+            let fullRequestWithDataUrls = { ...currentRequest };
 
             const updatedRequests = appData.requests.map((req: UserRequest) => {
                 if (req.id === currentRequest.id && req.exigencia) {
+                    const response = {
+                        text: exigenciaResponseText,
+                        files: documents,
+                        respondedAt: new Date().toISOString(),
+                    };
+                    
+                    fullRequestWithDataUrls = {
+                         ...req,
+                        status: 'Em análise' as RequestStatus,
+                        exigencia: {
+                            ...req.exigencia,
+                            response: response,
+                        }
+                    };
+                    
+                    // Return version for localStorage (without file content)
                     return {
-                        ...req,
+                         ...req,
                         status: 'Em análise' as RequestStatus,
                         exigencia: {
                             ...req.exigencia,
                             response: {
-                                text: exigenciaResponseText,
-                                files: documents,
-                                respondedAt: new Date().toISOString(),
-                            }
+                                ...response,
+                                files: documents.map(({name}) => ({ name, url: ''}))
+                            },
                         }
                     };
                 }
@@ -129,13 +164,15 @@ export default function MeusPedidosPage() {
             appData.requests = updatedRequests;
             localStorage.setItem('appData', JSON.stringify(appData));
             
+            // Save the version with data URLs to session storage
+            sessionStorage.setItem(currentRequest.id, JSON.stringify(fullRequestWithDataUrls));
+            
             loadRequests();
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
             setExigenciaFiles([]);
-            const updatedCurrentRequest = updatedRequests.find((req: UserRequest) => req.id === currentRequest.id);
-            setCurrentRequest(updatedCurrentRequest || null);
-            setIsDetailsModalOpen(!!updatedCurrentRequest);
+            setCurrentRequest(fullRequestWithDataUrls);
+            setIsDetailsModalOpen(true);
 
         } catch (error) {
             console.error("Failed to update exigencia", error);
@@ -262,7 +299,11 @@ export default function MeusPedidosPage() {
                                                             <p className="font-semibold">Arquivos enviados:</p>
                                                             <ul className="list-disc pl-4">
                                                                 {currentRequest.exigencia.response.files.map((file, i) => (
-                                                                    <li key={i}>{file.name}</li>
+                                                                    <li key={i}>
+                                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">
+                                                                            {file.name}
+                                                                        </a>
+                                                                    </li>
                                                                 ))}
                                                             </ul>
                                                         </div>
@@ -349,7 +390,11 @@ export default function MeusPedidosPage() {
                                                 <p className="font-semibold">Arquivos enviados:</p>
                                                 <ul className="list-disc pl-4">
                                                     {currentRequest.exigencia.response.files.map((file, i) => (
-                                                         <li key={i}>{file.name}</li>
+                                                         <li key={i}>
+                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">
+                                                                {file.name}
+                                                            </a>
+                                                        </li>
                                                     ))}
                                                 </ul>
                                             </div>
@@ -417,3 +462,5 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
+
+    
