@@ -83,6 +83,13 @@ export default function MeusPedidosPage() {
         setCurrentRequest(request);
         setIsDetailsModalOpen(true);
     };
+    
+    const viewDocument = (doc: Documento) => {
+        if (typeof window !== 'undefined') {
+            sessionStorage.setItem('documentToView', JSON.stringify(doc));
+            window.open('/view-document', '_blank');
+        }
+    };
 
     const handleOpenExigencia = (request: UserRequest) => {
         setCurrentRequest(request);
@@ -326,10 +333,10 @@ export default function MeusPedidosPage() {
                                 </h3>
                                 <div className="space-y-2">
                                     {currentRequest.documents.map((doc, index) => (
-                                        <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                        <button onClick={() => viewDocument(doc)} key={index} className="flex w-full text-left items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                             <LinkIcon className="h-4 w-4" />
                                             <span className="text-sm font-medium text-primary underline">{doc.name}</span>
-                                        </a>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
@@ -367,10 +374,10 @@ export default function MeusPedidosPage() {
                                                 {currentRequest.exigencia.response.documents && currentRequest.exigencia.response.documents.length > 0 && (
                                                     <div className="text-left mt-2 grid gap-2">
                                                         {currentRequest.exigencia.response.documents.map((doc, index) => (
-                                                             <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                                            <button onClick={() => viewDocument(doc)} key={index} className="flex w-full text-left items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                                                 <LinkIcon className="h-4 w-4" />
                                                                 <span className="text-sm font-medium text-primary underline">{doc.name}</span>
-                                                            </a>
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 )}

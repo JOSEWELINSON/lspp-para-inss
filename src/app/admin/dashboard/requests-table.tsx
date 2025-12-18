@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip } from 'lucide-react';
-import { type RequestStatus, type UserRequest } from '@/lib/data';
+import { type RequestStatus, type UserRequest, type Documento } from '@/lib/data';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -84,6 +84,13 @@ export function AdminRequestsTable() {
     const openDetailsModal = (request: UserRequest) => {
         setCurrentRequest(request);
         setIsDetailsModalOpen(true);
+    };
+
+    const viewDocument = (doc: Documento) => {
+        if (typeof window !== 'undefined') {
+            sessionStorage.setItem('documentToView', JSON.stringify(doc));
+            window.open('/view-document', '_blank');
+        }
     };
 
     const handleStatusChange = async (requestId: string, newStatus: RequestStatus) => {
@@ -246,10 +253,10 @@ export function AdminRequestsTable() {
                                             <p className="font-semibold text-sm flex items-center gap-2 mb-2"><Paperclip /> Documentos Anexados:</p>
                                             <div className="grid gap-2">
                                                 {currentRequest.documents.map((doc, index) => (
-                                                    <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                                    <button onClick={() => viewDocument(doc)} key={index} className="flex w-full text-left items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                                         <LinkIcon className="h-4 w-4" />
                                                         <span className="text-sm font-medium text-primary underline">{doc.name}</span>
-                                                    </a>
+                                                    </button>
                                                 ))}
                                             </div>
                                         </div>
@@ -310,10 +317,10 @@ export function AdminRequestsTable() {
                                                              <p className="font-semibold text-sm flex items-center gap-2 mb-2 justify-end"><Paperclip /> Documentos da Resposta:</p>
                                                             <div className="grid gap-2">
                                                                 {currentRequest.exigencia.response.documents.map((doc, index) => (
-                                                                    <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors justify-end">
+                                                                    <button onClick={() => viewDocument(doc)} key={index} className="flex w-full justify-end text-right items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                                                         <span className="text-sm font-medium text-primary underline">{doc.name}</span>
                                                                         <LinkIcon className="h-4 w-4" />
-                                                                    </a>
+                                                                    </button>
                                                                 ))}
                                                             </div>
                                                         </div>
