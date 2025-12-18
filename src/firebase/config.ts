@@ -1,9 +1,12 @@
+
+// As chaves de configuração foram movidas para variáveis de ambiente.
+// Preencha o arquivo .env com os valores do seu projeto Firebase.
 export const firebaseConfig = {
-  "projectId": "studio-452861249-230c0",
-  "appId": "1:115791268028:web:200f533f239b1e69ba68b9",
-  "storageBucket": "studio-452861249-230c0.appspot.com",
-  "apiKey": "AIzaSyBIU22YHUf9FpRZDFQJsr1aD-SzY7e7U8s",
-  "authDomain": "studio-452861249-230c0.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "115791268028"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
