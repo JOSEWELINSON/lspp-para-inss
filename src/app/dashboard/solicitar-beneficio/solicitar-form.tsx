@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Upload, Link as LinkIcon, Paperclip } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -30,10 +29,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { benefits, type UserRequest, type Document, type UserProfile } from "@/lib/data";
-import { useDoc, useFirestore, useUser, useMemoFirebase, useStorage } from "@/firebase";
-import { uploadFile } from "@/firebase/storage";
-
+import { benefits, type UserRequest, type UserProfile } from "@/lib/data";
+import { useDoc, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 
 const formSchema = z.object({
   benefitId: z.string({ required_error: "Por favor, selecione um benefício." }),
@@ -53,10 +50,8 @@ export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const storage = useStorage();
   const userCpf = getUserCpf();
 
   const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
@@ -68,12 +63,6 @@ export function SolicitarBeneficioForm() {
       description: "",
     },
   });
-  
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFilesToUpload(Array.from(e.target.files));
-    }
-  };
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!userCpf || !userProfile) {
@@ -89,27 +78,16 @@ export function SolicitarBeneficioForm() {
     setIsSubmitting(true);
     
     try {
-        const requestId = `${userCpf}-${Date.now()}`;
-        
-        let uploadedDocuments: Document[] = [];
-        if (filesToUpload.length > 0) {
-            const uploadPromises = filesToUpload.map(file => 
-                uploadFile(storage, file, `requests/${requestId}/${file.name}`)
-            );
-            uploadedDocuments = await Promise.all(uploadPromises);
-        }
-        
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
         
-        const newRequest: Omit<UserRequest, 'id'> = {
+        const newRequest: Omit<UserRequest, 'id' | 'documents'> = {
             protocol,
             benefitId: values.benefitId,
             benefitTitle: selectedBenefit?.title || 'Benefício Desconhecido',
             requestDate: serverTimestamp(),
             status: 'Em análise',
             description: values.description,
-            documents: uploadedDocuments,
             userId: userCpf, 
             user: {
                 name: userProfile.fullName,
@@ -131,13 +109,7 @@ export function SolicitarBeneficioForm() {
         toast({
           variant: "destructive",
           title: "Erro ao Enviar Solicitação",
-          description: error.message?.includes('storage/unauthorized') 
-            ? "Você não tem permissão para enviar arquivos." 
-            : error.message?.includes('storage/object-not-found') 
-            ? "O arquivo não foi encontrado."
-            : error.message?.includes('size-exceeded')
-            ? "O arquivo excede o tamanho máximo de 20MB."
-            : "Não foi possível registrar seu pedido. Tente novamente.",
+          description: "Não foi possível registrar seu pedido. Tente novamente.",
         });
     } finally {
         setIsSubmitting(false);
@@ -201,33 +173,6 @@ export function SolicitarBeneficioForm() {
                 </FormItem>
               )}
             />
-            <FormItem>
-              <FormLabel>Anexar Documentos</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Input type="file" className="pl-12" multiple onChange={handleFileChange} disabled={isLoading} />
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <Upload className="h-5 w-5 text-gray-400" />
-                  </div>
-                </div>
-              </FormControl>
-              <FormDescription>
-                Anexe RG, CPF, comprovante de residência, laudos médicos, etc. (Máx: 20MB por arquivo).
-              </FormDescription>
-              {filesToUpload.length > 0 && (
-                <div className="text-sm text-muted-foreground mt-2 space-y-1">
-                    <p className="font-medium">Arquivos a serem enviados:</p>
-                    <ul className="list-disc pl-5">
-                        {filesToUpload.map((file, i) => (
-                            <li key={i} className="flex items-center gap-2">
-                                <Paperclip className="h-3 w-3" />
-                                {file.name}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-              )}
-            </FormItem>
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
             <Button type="submit" disabled={isLoading}>

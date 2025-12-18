@@ -28,15 +28,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { type RequestStatus, type UserRequest, type Document } from '@/lib/data';
+import { type RequestStatus, type UserRequest } from '@/lib/data';
 import { Label } from '@/components/ui/label';
-import { FormDescription } from '@/components/ui/form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
-import { collection, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
-import { uploadFile } from '@/firebase/storage';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -59,7 +57,6 @@ export default function MeusPedidosPage() {
     const { toast } = useToast();
     const { user } = useUser();
     const firestore = useFirestore();
-    const storage = useStorage();
     const userCpf = getUserCpf();
     
     const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
@@ -69,7 +66,6 @@ export default function MeusPedidosPage() {
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
-    const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     
     const openDetailsModal = (request: UserRequest) => {
@@ -82,26 +78,13 @@ export default function MeusPedidosPage() {
         setIsExigenciaModalOpen(true);
     };
 
-    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setFilesToUpload(Array.from(e.target.files));
-        }
-    };
-
     const handleCumprirExigencia = async () => {
-        if (!currentRequest || !userCpf || !storage) return;
+        if (!currentRequest || !userCpf || !firestore) return;
         setIsUploading(true);
 
         try {
-            const uploadPromises = filesToUpload.map(file => {
-                const filePath = `requests/${currentRequest.id}/${file.name}`;
-                return uploadFile(storage, file, filePath);
-            });
-            const uploadedDocuments = await Promise.all(uploadPromises);
-
             const response = {
                 text: exigenciaResponseText,
-                files: uploadedDocuments,
                 respondedAt: new Date().toISOString(),
             };
             
@@ -123,7 +106,6 @@ export default function MeusPedidosPage() {
             
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
-            setFilesToUpload([]);
             const updatedRequest = { ...currentRequest, ...payload };
             setCurrentRequest(updatedRequest);
             setIsDetailsModalOpen(true);
@@ -269,21 +251,6 @@ export default function MeusPedidosPage() {
                                             <div className="flex-1 space-y-1 text-right">
                                                 <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
                                                     <p className="text-sm">{currentRequest.exigencia.response.text}</p>
-                                                    {currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0 && (
-                                                        <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
-                                                            <p className="font-semibold">Arquivos enviados:</p>
-                                                            <ul className="list-disc pl-4">
-                                                                {currentRequest.exigencia.response.files.map((file, i) => (
-                                                                    <li key={i}>
-                                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 flex items-center gap-1">
-                                                                            <LinkIcon className="h-3 w-3" />
-                                                                            {file.name}
-                                                                        </a>
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                    )}
                                                 </div>
                                                 <p className="text-xs text-muted-foreground">Você em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                             </div>
@@ -361,21 +328,6 @@ export default function MeusPedidosPage() {
                                 <div className="flex-1 space-y-1 text-right">
                                     <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
                                         <p className="text-sm">{currentRequest.exigencia.response.text}</p>
-                                        {currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0 && (
-                                            <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
-                                                <p className="font-semibold">Arquivos enviados:</p>
-                                                <ul className="list-disc pl-4">
-                                                    {currentRequest.exigencia.response.files.map((file, i) => (
-                                                         <li key={i}>
-                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 flex items-center gap-1">
-                                                                <LinkIcon className="h-3 w-3" />
-                                                                {file.name}
-                                                            </a>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
                                     </div>
                                     <p className="text-xs text-muted-foreground">Você em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                 </div>
@@ -397,37 +349,6 @@ export default function MeusPedidosPage() {
                                         disabled={isUploading}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="response-files" className="font-semibold">Anexar Documentos</Label>
-                                    <div className="relative">
-                                        <Input type="file" id="response-files" className="pl-12" multiple onChange={handleFileChange} disabled={isUploading} />
-                                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                            <Upload className="h-5 w-5 text-gray-400" />
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Máx: 20MB por arquivo.
-                                    </p>
-                                     {isUploading && (
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            <span>Carregando arquivos...</span>
-                                        </div>
-                                    )}
-                                    {filesToUpload.length > 0 && (
-                                        <div className="text-sm text-muted-foreground mt-2 space-y-1">
-                                            <p className="font-medium">Arquivos a serem enviados:</p>
-                                            <ul className="list-disc pl-5">
-                                                {filesToUpload.map((file, i) => (
-                                                    <li key={i} className="flex items-center gap-2">
-                                                        <Paperclip className="h-3 w-3" />
-                                                        {file.name}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
                             </Fragment>
                         )}
                          {currentRequest.exigencia.response && (
@@ -440,9 +361,9 @@ export default function MeusPedidosPage() {
                     </div>
                     
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => { setFilesToUpload([]); setExigenciaResponseText(""); }}>Fechar</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => { setExigenciaResponseText(""); }}>Fechar</AlertDialogCancel>
                          {!currentRequest.exigencia.response && (
-                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() && filesToUpload.length === 0 || isUploading}>
+                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() || isUploading}>
                                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                                 {isUploading ? 'Enviando...' : 'Enviar Resposta'}
                             </AlertDialogAction>

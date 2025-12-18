@@ -41,11 +41,6 @@ export const benefits: Benefit[] = [
 
 export type RequestStatus = 'Em análise' | 'Exigência' | 'Deferido' | 'Indeferido' | 'Compareça presencialmente';
 
-export type Document = {
-  name: string;
-  url: string; 
-}
-
 export type UserProfile = {
     id: string;
     cpf: string;
@@ -64,7 +59,6 @@ export type UserRequest = {
   requestDate: Timestamp | string;
   status: RequestStatus;
   description: string;
-  documents: Document[];
   userId: string;
   user: {
     name: string;
@@ -75,7 +69,6 @@ export type UserRequest = {
     createdAt: Timestamp | string;
     response?: {
       text: string;
-      files: Document[];
       respondedAt: Timestamp | string;
     }
   }

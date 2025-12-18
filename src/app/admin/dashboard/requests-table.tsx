@@ -239,23 +239,6 @@ export function AdminRequestsTable() {
                                         <p className="font-semibold text-sm">Descrição do usuário:</p>
                                         <p className="text-sm text-muted-foreground italic mt-1">"{currentRequest.description}"</p>
                                     </div>
-                                    <div>
-                                        <p className="font-semibold text-sm">Documentos Anexados:</p>
-                                        {(currentRequest.documents && currentRequest.documents.length > 0) ? (
-                                            <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
-                                                {currentRequest.documents.map((doc, i) => (
-                                                    <li key={i}>
-                                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary flex items-center gap-1">
-                                                            <LinkIcon className="h-3 w-3" />
-                                                            {doc.name}
-                                                        </a>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground italic mt-1">Nenhum documento foi anexado na abertura do pedido.</p>
-                                        )}
-                                    </div>
                                 </div>
                             </div>
 
@@ -306,24 +289,6 @@ export function AdminRequestsTable() {
                                                 <div className="flex-1 space-y-1 text-right">
                                                      <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
                                                         <p className="text-sm">{currentRequest.exigencia.response.text}</p>
-                                                        
-                                                         <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
-                                                            <p className="font-semibold">Arquivos enviados:</p>
-                                                            {(currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0) ? (
-                                                                <ul className="list-disc pl-4">
-                                                                    {currentRequest.exigencia.response.files.map((file, i) => (
-                                                                        <li key={i}>
-                                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 flex items-center gap-1">
-                                                                                <LinkIcon className="h-3 w-3" />
-                                                                                {file.name}
-                                                                            </a>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            ) : (
-                                                                <p className="italic">O usuário não anexou documentos.</p>
-                                                            )}
-                                                        </div>
                                                     </div>
                                                     <p className="text-xs text-muted-foreground">Segurado em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                                 </div>
@@ -376,7 +341,3 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
-
-    
-
-    
