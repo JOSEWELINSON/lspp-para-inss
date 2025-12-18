@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useState, Fragment, ChangeEvent } from 'react';
+import { useEffect, useState, Fragment, ChangeEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, UploadCloud, X } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, X } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -36,7 +36,6 @@ import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } fro
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile } from '@/firebase/storage';
-import { FormControl } from '@/components/ui/form';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -60,6 +59,7 @@ export default function MeusPedidosPage() {
     const firestore = useFirestore();
     const storage = useStorage();
     const userCpf = getUserCpf();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
     const { data: myRequests, isLoading } = useCollection<UserRequest>(requestsQuery);
@@ -94,12 +94,13 @@ export default function MeusPedidosPage() {
 
 
     const handleCumprirExigencia = async () => {
-        if (!currentRequest || !userCpf || !firestore) return;
+        if (!currentRequest || !userCpf || !firestore || !storage) return;
         setIsUploading(true);
 
         try {
             const uploadedDocuments: Documento[] = [];
-            if (filesToUpload.length > 0 && storage) {
+            if (filesToUpload.length > 0) {
+                // Use a standard for...of loop for async operations in sequence
                 for (const file of filesToUpload) {
                     const uploadedDoc = await uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`);
                     uploadedDocuments.push(uploadedDoc);
@@ -250,7 +251,7 @@ export default function MeusPedidosPage() {
                                 <p className="font-semibold">Data</p>
                                 <p className="text-muted-foreground">{formatDate(currentRequest.requestDate)}</p>
                             </div>
-                            <div>
+                             <div>
                                 <p className="font-semibold">Status</p>
                                 <div>
                                     <Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge>
@@ -412,21 +413,31 @@ export default function MeusPedidosPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Anexar Novos Documentos</label>
-                                    <div>
-                                        <div className="flex items-center justify-center w-full">
-                                            <label htmlFor="exigencia-file-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                    <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
-                                                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Clique para enviar</span></p>
-                                                </div>
-                                                <Input id="exigencia-file-upload" type="file" className="hidden" onChange={handleFileChange} multiple disabled={isUploading}/>
-                                            </label>
-                                        </div>
+                                    <Label>Anexar Novos Documentos</Label>
+                                    <div className="flex flex-col gap-4">
+                                        <Input 
+                                            id="exigencia-file-upload"
+                                            type="file" 
+                                            className="hidden" 
+                                            onChange={handleFileChange} 
+                                            multiple 
+                                            disabled={isUploading}
+                                            ref={fileInputRef}
+                                        />
+                                        <Button 
+                                            type="button" 
+                                            variant="outline" 
+                                            onClick={() => fileInputRef.current?.click()} 
+                                            disabled={isUploading}
+                                            className="w-fit"
+                                        >
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Selecionar Arquivos
+                                        </Button>
+                                         <p className="text-sm text-muted-foreground">
+                                            Máx: 20MB por arquivo.
+                                        </p>
                                     </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Máx: 20MB por arquivo.
-                                    </p>
                                 </div>
                                 {filesToUpload.length > 0 && (
                                     <div className="space-y-2">
@@ -434,11 +445,11 @@ export default function MeusPedidosPage() {
                                         <div className="grid gap-2">
                                             {filesToUpload.map((file, index) => (
                                                 <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="h-5 w-5 text-muted-foreground" />
-                                                        <span className="text-sm text-foreground truncate">{file.name}</span>
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                        <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                                        <span className="text-sm text-foreground truncate" title={file.name}>{file.name}</span>
                                                     </div>
-                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6">
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6 flex-shrink-0">
                                                         <X className="h-4 w-4" />
                                                     </Button>
                                                 </div>

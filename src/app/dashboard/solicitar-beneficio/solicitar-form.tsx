@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, UploadCloud, File as FileIcon, X } from "lucide-react";
+import { Loader2, Upload, File as FileIcon, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,7 @@ export function SolicitarBeneficioForm() {
   const firestore = useFirestore();
   const storage = useStorage();
   const userCpf = getUserCpf();
+  const fileInputRef = useState<HTMLInputElement>(null);
 
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 
@@ -81,11 +82,11 @@ export function SolicitarBeneficioForm() {
   };
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!userCpf || !userProfile) {
+    if (!userCpf || !userProfile || !storage) {
         toast({
             variant: 'destructive',
-            title: "Erro de Autenticação",
-            description: "Usuário não encontrado. Faça o login novamente.",
+            title: "Erro de Autenticação ou Serviço",
+            description: "Usuário não encontrado ou serviço de armazenamento indisponível. Faça o login novamente.",
         });
         router.push('/');
         return;
@@ -202,21 +203,30 @@ export function SolicitarBeneficioForm() {
 
             <FormItem>
                 <FormLabel>Anexar Documentos</FormLabel>
-                <FormControl>
-                    <div className="flex items-center justify-center w-full">
-                        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
-                                <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Clique para enviar</span> ou arraste e solte</p>
-                                <p className="text-xs text-muted-foreground">PDF, PNG, JPG (MAX. 20MB por arquivo)</p>
-                            </div>
-                            <Input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} multiple disabled={isLoading}/>
-                        </label>
-                    </div>
-                </FormControl>
-                 <FormDescription>
-                    Você pode anexar laudos, comprovantes, etc.
-                </FormDescription>
+                <div className="flex flex-col gap-4">
+                  <Input 
+                      id="file-upload"
+                      type="file" 
+                      className="hidden" 
+                      onChange={handleFileChange} 
+                      multiple 
+                      disabled={isLoading}
+                      ref={fileInputRef as any}
+                  />
+                  <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => (fileInputRef as any).current.click()} 
+                      disabled={isLoading}
+                      className="w-fit"
+                  >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Selecionar Arquivos
+                  </Button>
+                  <FormDescription>
+                      Você pode anexar laudos, comprovantes, etc. (PDF, PNG, JPG - Máx. 20MB por arquivo).
+                  </FormDescription>
+                </div>
             </FormItem>
 
             {filesToUpload.length > 0 && (
@@ -225,11 +235,11 @@ export function SolicitarBeneficioForm() {
                     <div className="grid gap-2">
                         {filesToUpload.map((file, index) => (
                             <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted">
-                                <div className="flex items-center gap-2">
-                                    <FileIcon className="h-5 w-5 text-muted-foreground" />
-                                    <span className="text-sm text-foreground truncate">{file.name}</span>
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <FileIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                    <span className="text-sm text-foreground truncate" title={file.name}>{file.name}</span>
                                 </div>
-                                <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6">
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6 flex-shrink-0">
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
