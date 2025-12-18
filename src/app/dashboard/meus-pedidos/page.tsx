@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send, User, ShieldCheck } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 import {
   Table,
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { type RequestStatus, type UserRequest } from '@/lib/data';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 
@@ -40,18 +41,11 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
-const statusColorClasses: Record<RequestStatus, string> = {
-    'Em análise': 'bg-yellow-500',
-    'Exigência': 'bg-orange-500',
-    'Deferido': 'bg-green-500',
-    'Indeferido': 'bg-red-500',
-    'Compareça presencialmente': 'bg-blue-500'
-};
-
 export default function MeusPedidosPage() {
     const router = useRouter();
     const [myRequests, setMyRequests] = useState<UserRequest[]>([]);
     const [isExigenciaModalOpen, setIsExigenciaModalOpen] = useState(false);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
     const [exigenciaFiles, setExigenciaFiles] = useState<File[]>([]);
@@ -78,11 +72,16 @@ export default function MeusPedidosPage() {
             console.error("Failed to load requests from local storage", error);
         }
     };
+    
+    const openDetailsModal = (request: UserRequest) => {
+        setCurrentRequest(request);
+        setIsDetailsModalOpen(true);
+    };
 
     const handleOpenExigencia = (request: UserRequest) => {
         setCurrentRequest(request);
-        setIsExigenciaModalOpen(true);
         setExigenciaResponseText(request.exigencia?.response?.text || "");
+        setIsExigenciaModalOpen(true);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,7 +154,7 @@ export default function MeusPedidosPage() {
                     </TableHeader>
                     <TableBody>
                         {myRequests.length > 0 ? myRequests.map((request) => (
-                            <TableRow key={request.id} className={request.status === 'Exigência' ? 'bg-orange-100/50' : ''}>
+                            <TableRow key={request.id} onClick={() => openDetailsModal(request)} className={`cursor-pointer ${request.status === 'Exigência' ? 'bg-orange-100/50 dark:bg-orange-900/20' : ''}`}>
                                 <TableCell className="font-medium">{request.benefitTitle}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline">{request.protocol}</Badge>
@@ -168,9 +167,9 @@ export default function MeusPedidosPage() {
                                 </TableCell>
                                 <TableCell>
                                     {request.status === 'Exigência' && (
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenExigencia(request)}>
+                                        <Button variant="outline" size="sm" onClick={(e) => {e.stopPropagation(); handleOpenExigencia(request)}}>
                                             <AlertTriangle className="mr-2 h-4 w-4" />
-                                            Ver Exigência
+                                            Responder
                                         </Button>
                                     )}
                                 </TableCell>
@@ -187,6 +186,114 @@ export default function MeusPedidosPage() {
             </div>
         </div>
 
+        {/* Details Modal */}
+        {currentRequest && (
+            <AlertDialog open={isDetailsModalOpen} onOpenChange={(open) => !open && setCurrentRequest(null)}>
+                <AlertDialogContent className="max-w-3xl">
+                    <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                        <FileText />
+                        Detalhes da Solicitação
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Protocolo: {currentRequest.protocol}
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-6 -mr-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <p className="font-semibold">Benefício Solicitado</p>
+                                <p className="text-muted-foreground">{currentRequest.benefitTitle}</p>
+                            </div>
+                            <div>
+                                <p className="font-semibold">Data</p>
+                                <p className="text-muted-foreground">{format(new Date(currentRequest.requestDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                            </div>
+                            <div>
+                                <p className="font-semibold">Status</p>
+                                <p><Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge></p>
+                            </div>
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div className="space-y-2">
+                            <h3 className="font-semibold flex items-center gap-2">
+                                <AlertTriangle className="text-orange-500" />
+                                Histórico de Exigências
+                            </h3>
+                            {currentRequest.exigencia ? (
+                                <div className="space-y-4 border rounded-lg p-4 bg-background">
+                                     <div className="flex gap-3">
+                                        <Avatar className="h-8 w-8 border-2 border-primary">
+                                            <AvatarFallback className="bg-primary text-primary-foreground">
+                                                <ShieldCheck className="h-5 w-5" />
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 space-y-1">
+                                            <div className="bg-muted rounded-lg p-3">
+                                                <p className="text-sm text-foreground">{currentRequest.exigencia.text}</p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">INSS em {new Date(currentRequest.exigencia.createdAt).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                    </div>
+
+                                    {currentRequest.exigencia.response ? (
+                                         <div className="flex gap-3">
+                                            <div className="flex-1 space-y-1 text-right">
+                                                <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
+                                                    <p className="text-sm">{currentRequest.exigencia.response.text}</p>
+                                                    {currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0 && (
+                                                        <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
+                                                            <p className="font-semibold">Arquivos enviados:</p>
+                                                            <ul className="list-disc pl-4">
+                                                                {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">Você em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}</p>
+                                            </div>
+                                             <Avatar className="h-8 w-8">
+                                                <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>
+                                            </Avatar>
+                                        </div>
+                                    ) : (
+                                        <Card className="bg-orange-50 border-orange-200 mt-4 text-center">
+                                            <CardContent className="p-3">
+                                                <p className="text-sm text-orange-800">
+                                                    Você tem uma exigência pendente. Clique em "Responder" na tela anterior para cumpri-la.
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground p-4 border rounded-lg bg-background text-center">Nenhuma exigência para esta solicitação.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setIsDetailsModalOpen(false)}>Fechar</AlertDialogCancel>
+                         {currentRequest.status === 'Exigência' && !currentRequest.exigencia?.response && (
+                            <Button onClick={(e) => {
+                                e.stopPropagation();
+                                setIsDetailsModalOpen(false);
+                                handleOpenExigencia(currentRequest);
+                            }}>
+                                <AlertTriangle className="mr-2 h-4 w-4" />
+                                Responder Exigência
+                            </Button>
+                         )}
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        )}
+
+
+        {/* Respond to Exigencia Modal */}
         {currentRequest?.exigencia && (
             <AlertDialog open={isExigenciaModalOpen} onOpenChange={setIsExigenciaModalOpen}>
                 <AlertDialogContent className="max-w-2xl">
@@ -203,7 +310,6 @@ export default function MeusPedidosPage() {
                     </AlertDialogHeader>
                     
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 -mr-4">
-                        {/* Server message */}
                         <div className="flex gap-3">
                             <Avatar className="h-8 w-8 border-2 border-primary">
                                 <AvatarFallback className="bg-primary text-primary-foreground">
@@ -219,7 +325,6 @@ export default function MeusPedidosPage() {
                         </div>
 
                         {currentRequest.exigencia.response ? (
-                             // User response - already sent
                             <div className="flex gap-3">
                                 <div className="flex-1 space-y-1 text-right">
                                     <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
@@ -240,7 +345,6 @@ export default function MeusPedidosPage() {
                                 </Avatar>
                             </div>
                         ) : (
-                            // User response form
                             <Fragment>
                                 <Separator className="my-4" />
                                 <div className="space-y-4">
