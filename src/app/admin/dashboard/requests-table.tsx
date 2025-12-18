@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2 } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon } from 'lucide-react';
 import { type RequestStatus, type UserRequest } from '@/lib/data';
 import {
   AlertDialog,
@@ -245,7 +245,8 @@ export function AdminRequestsTable() {
                                             <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
                                                 {currentRequest.documents.map((doc, i) => (
                                                     <li key={i}>
-                                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary flex items-center gap-1">
+                                                            <LinkIcon className="h-3 w-3" />
                                                             {doc.name}
                                                         </a>
                                                     </li>
@@ -312,7 +313,8 @@ export function AdminRequestsTable() {
                                                                 <ul className="list-disc pl-4">
                                                                     {currentRequest.exigencia.response.files.map((file, i) => (
                                                                         <li key={i}>
-                                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">
+                                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 flex items-center gap-1">
+                                                                                <LinkIcon className="h-3 w-3" />
                                                                                 {file.name}
                                                                             </a>
                                                                         </li>

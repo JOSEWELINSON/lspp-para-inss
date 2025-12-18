@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2 } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -117,7 +117,8 @@ export default function MeusPedidosPage() {
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
             setExigenciaFiles([]);
-            setCurrentRequest({ ...currentRequest, ...payload });
+            const updatedRequest = { ...currentRequest, ...payload };
+            setCurrentRequest(updatedRequest);
             setIsDetailsModalOpen(true);
 
         } catch (error) {
@@ -262,7 +263,8 @@ export default function MeusPedidosPage() {
                                                             <ul className="list-disc pl-4">
                                                                 {currentRequest.exigencia.response.files.map((file, i) => (
                                                                     <li key={i}>
-                                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">
+                                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 flex items-center gap-1">
+                                                                            <LinkIcon className="h-3 w-3" />
                                                                             {file.name}
                                                                         </a>
                                                                     </li>
@@ -353,7 +355,8 @@ export default function MeusPedidosPage() {
                                                 <ul className="list-disc pl-4">
                                                     {currentRequest.exigencia.response.files.map((file, i) => (
                                                          <li key={i}>
-                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">
+                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 flex items-center gap-1">
+                                                                <LinkIcon className="h-3 w-3" />
                                                                 {file.name}
                                                             </a>
                                                         </li>
