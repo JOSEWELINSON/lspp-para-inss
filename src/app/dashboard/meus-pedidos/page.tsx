@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { type RequestStatus, type UserRequest, type Document } from '@/lib/data';
 import { Label } from '@/components/ui/label';
+import { FormDescription } from '@/components/ui/form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -88,7 +89,7 @@ export default function MeusPedidosPage() {
     };
 
     const handleCumprirExigencia = async () => {
-        if (!currentRequest || !userCpf) return;
+        if (!currentRequest || !userCpf || !storage) return;
         setIsUploading(true);
 
         try {
@@ -443,7 +444,7 @@ export default function MeusPedidosPage() {
                     <AlertDialogFooter>
                         <AlertDialogCancel onClick={() => { setFilesToUpload([]); setExigenciaResponseText(""); }}>Fechar</AlertDialogCancel>
                          {!currentRequest.exigencia.response && (
-                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() || isUploading}>
+                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() && filesToUpload.length === 0 || isUploading}>
                                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                                 {isUploading ? 'Enviando...' : 'Enviar Resposta'}
                             </AlertDialogAction>
