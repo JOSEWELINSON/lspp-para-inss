@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Paperclip as PaperclipIcon } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText } from 'lucide-react';
 import { type RequestStatus, type UserRequest } from '@/lib/data';
 import {
   AlertDialog,
@@ -223,7 +223,7 @@ export function AdminRequestsTable() {
                             {/* Initial Request Details */}
                             <div className="space-y-2">
                                 <h3 className="font-semibold flex items-center gap-2">
-                                    <PaperclipIcon />
+                                    <FileText />
                                     Dados Iniciais da Solicitação
                                 </h3>
                                 <div className="space-y-4 border rounded-lg p-4 bg-background">
@@ -236,9 +236,7 @@ export function AdminRequestsTable() {
                                         {(currentRequest.documents && currentRequest.documents.length > 0) ? (
                                             <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
                                                 {currentRequest.documents.map((doc, i) => (
-                                                    <li key={i}>
-                                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{doc.name}</a>
-                                                    </li>
+                                                    <li key={i}>{doc.name}</li>
                                                 ))}
                                             </ul>
                                         ) : (
@@ -301,9 +299,7 @@ export function AdminRequestsTable() {
                                                             {(currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0) ? (
                                                                 <ul className="list-disc pl-4">
                                                                     {currentRequest.exigencia.response.files.map((file, i) => (
-                                                                        <li key={i}>
-                                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file.name}</a>
-                                                                        </li>
+                                                                        <li key={i}>{file.name}</li>
                                                                     ))}
                                                                 </ul>
                                                             ) : (

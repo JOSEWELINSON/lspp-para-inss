@@ -43,15 +43,6 @@ type User = {
     cpf: string;
 }
 
-const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-    });
-};
-
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
@@ -111,19 +102,9 @@ export function SolicitarBeneficioForm() {
 
     if (documentFiles) {
         for (const file of Array.from(documentFiles)) {
-            try {
-                const url = await fileToBase64(file);
-                documents.push({ name: file.name, url });
-            } catch (error) {
-                console.error("Error converting file to Base64", error);
-                toast({
-                    variant: "destructive",
-                    title: `Erro ao processar o arquivo ${file.name}`,
-                    description: "Tente novamente ou escolha outro arquivo.",
-                });
-                setIsLoading(false);
-                return;
-            }
+             // We no longer convert to base64 to avoid storage quota errors.
+             // We will just store the file name. The URL will be a placeholder.
+            documents.push({ name: file.name, url: "" });
         }
     }
 
@@ -156,12 +137,15 @@ export function SolicitarBeneficioForm() {
         setIsLoading(false);
         router.push("/dashboard/meus-pedidos");
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to save request", error);
+        
+        const isQuotaError = error.name === 'QuotaExceededError';
+
         toast({
           variant: "destructive",
-          title: "Erro ao Salvar Solicitação",
-          description: "Não foi possível registrar seu pedido. Tente novamente.",
+          title: isQuotaError ? "Erro de Armazenamento" : "Erro ao Salvar Solicitação",
+          description: isQuotaError ? "O armazenamento local está cheio. Tente limpar o cache do navegador ou remover solicitações antigas." : "Não foi possível registrar seu pedido. Tente novamente.",
         });
         setIsLoading(false);
     }

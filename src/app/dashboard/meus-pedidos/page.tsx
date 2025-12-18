@@ -42,15 +42,6 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
-const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-    });
-};
-
 
 export default function MeusPedidosPage() {
     const router = useRouter();
@@ -112,8 +103,9 @@ export default function MeusPedidosPage() {
             
             const documents: Document[] = [];
             for (const file of exigenciaFiles) {
-                const url = await fileToBase64(file);
-                documents.push({ name: file.name, url });
+                // We no longer convert to base64 to avoid storage quota errors.
+                // We will just store the file name. The URL will be a placeholder.
+                documents.push({ name: file.name, url: "" });
             }
 
             const updatedRequests = appData.requests.map((req: UserRequest) => {
@@ -270,9 +262,7 @@ export default function MeusPedidosPage() {
                                                             <p className="font-semibold">Arquivos enviados:</p>
                                                             <ul className="list-disc pl-4">
                                                                 {currentRequest.exigencia.response.files.map((file, i) => (
-                                                                    <li key={i}>
-                                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file.name}</a>
-                                                                    </li>
+                                                                    <li key={i}>{file.name}</li>
                                                                 ))}
                                                             </ul>
                                                         </div>
@@ -359,9 +349,7 @@ export default function MeusPedidosPage() {
                                                 <p className="font-semibold">Arquivos enviados:</p>
                                                 <ul className="list-disc pl-4">
                                                     {currentRequest.exigencia.response.files.map((file, i) => (
-                                                         <li key={i}>
-                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file.name}</a>
-                                                        </li>
+                                                         <li key={i}>{file.name}</li>
                                                     ))}
                                                 </ul>
                                             </div>
