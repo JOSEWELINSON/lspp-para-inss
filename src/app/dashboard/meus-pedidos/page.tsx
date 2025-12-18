@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState, Fragment, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -37,6 +36,7 @@ import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } fro
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile } from '@/firebase/storage';
+import { FormControl } from '@/components/ui/form';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -99,12 +99,11 @@ export default function MeusPedidosPage() {
 
         try {
             const uploadedDocuments: Documento[] = [];
-            if (filesToUpload.length > 0) {
-                const uploadPromises = filesToUpload.map(file => 
-                    uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`)
-                );
-                const results = await Promise.all(uploadPromises);
-                uploadedDocuments.push(...results);
+            if (filesToUpload.length > 0 && storage) {
+                for (const file of filesToUpload) {
+                    const uploadedDoc = await uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`);
+                    uploadedDocuments.push(uploadedDoc);
+                }
             }
 
             const response = {
@@ -473,5 +472,3 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
-
-    
