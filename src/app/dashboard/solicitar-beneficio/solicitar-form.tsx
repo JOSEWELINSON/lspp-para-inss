@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { benefits, type UserRequest, type Document, type UserProfile } from "@/lib/data";
 import { useDoc, useFirestore, useUser, useMemoFirebase, useStorage } from "@/firebase";
@@ -53,7 +54,8 @@ function getUserCpf() {
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
@@ -72,17 +74,18 @@ export function SolicitarBeneficioForm() {
   const fileRef = form.register("documents");
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!userCpf || !userProfile) {
+    if (!userCpf || !userProfile || !storage) {
         toast({
             variant: 'destructive',
-            title: "Erro de Autenticação",
-            description: "Usuário não encontrado. Faça o login novamente.",
+            title: "Erro de Autenticação ou Configuração",
+            description: "Usuário ou serviço de storage não encontrado. Faça o login novamente.",
         });
         router.push('/');
         return;
     }
 
-    setIsLoading(true);
+    setIsUploading(true);
+    setUploadProgress(0);
     
     try {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
@@ -93,10 +96,17 @@ export function SolicitarBeneficioForm() {
         let documents: Document[] = [];
 
         if (documentFiles && documentFiles.length > 0) {
-            const uploadPromises: Promise<Document>[] = Array.from(documentFiles).map(async (file) => {
-                const downloadUrl = await uploadFile(storage, file, `requests/${requestId}/${file.name}`);
-                return { name: file.name, url: downloadUrl };
-            });
+            const filesToUpload = Array.from(documentFiles);
+            const uploadPromises = filesToUpload.map(file => 
+                uploadFile(storage, file, `requests/${requestId}/${file.name}`, (progress) => {
+                    // For multiple files, we can average the progress.
+                    // This is a simplified approach. A more complex UI might show individual progresses.
+                    // Let's just track the first file for simplicity for now.
+                    if (file === filesToUpload[0]) {
+                        setUploadProgress(progress);
+                    }
+                })
+            );
             documents = await Promise.all(uploadPromises);
         }
 
@@ -108,15 +118,14 @@ export function SolicitarBeneficioForm() {
             status: 'Em análise',
             description: values.description,
             documents: documents,
-            userId: userCpf, // Use CPF as the userId
+            userId: userCpf, 
             user: {
                 name: userProfile.fullName,
                 cpf: userProfile.cpf,
             }
         };
     
-        const requestsCollection = collection(firestore, 'requests');
-        const docRef = await addDoc(requestsCollection, newRequest);
+        await addDoc(collection(firestore, 'requests'), newRequest);
 
         toast({
           title: "Solicitação Enviada com Sucesso!",
@@ -133,9 +142,12 @@ export function SolicitarBeneficioForm() {
           description: error.message || "Não foi possível registrar seu pedido. Verifique suas permissões ou tente novamente.",
         });
     } finally {
-        setIsLoading(false);
+        setIsUploading(false);
+        setUploadProgress(null);
     }
   }
+
+  const isLoading = isUserLoading || isUploading;
 
   return (
     <Card>
@@ -152,7 +164,7 @@ export function SolicitarBeneficioForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Benefício</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o benefício desejado" />
@@ -182,6 +194,7 @@ export function SolicitarBeneficioForm() {
                       className="resize-none"
                       rows={6}
                       {...field}
+                      disabled={isLoading}
                     />
                   </FormControl>
                   <FormDescription>
@@ -199,7 +212,7 @@ export function SolicitarBeneficioForm() {
                   <FormLabel>Anexar Documentos (Opcional)</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type="file" className="pl-12" multiple {...fileRef} />
+                      <Input type="file" className="pl-12" multiple {...fileRef} disabled={isLoading}/>
                       <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                         <Upload className="h-5 w-5 text-gray-400" />
                       </div>
@@ -212,11 +225,17 @@ export function SolicitarBeneficioForm() {
                 </FormItem>
               )}
             />
+             {uploadProgress !== null && (
+                <div className="space-y-2">
+                    <Progress value={uploadProgress} className="w-full" />
+                    <p className="text-sm text-center text-muted-foreground">Enviando arquivos... {Math.round(uploadProgress)}%</p>
+                </div>
+            )}
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
-            <Button type="submit" disabled={isLoading || isUserLoading}>
-              {(isLoading || isUserLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Enviar Solicitação
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isUploading ? 'Enviando...' : 'Enviar Solicitação'}
             </Button>
           </CardFooter>
         </form>

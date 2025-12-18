@@ -33,9 +33,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { collection, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { uploadFile } from '@/firebase/storage';
+import { useToast } from '@/hooks/use-toast';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -54,7 +56,8 @@ function getUserCpf() {
 
 export default function MeusPedidosPage() {
     const router = useRouter();
-    const { user } = useUser(); // Still useful for session checking
+    const { toast } = useToast();
+    const { user } = useUser();
     const firestore = useFirestore();
     const storage = useStorage();
     const userCpf = getUserCpf();
@@ -68,6 +71,7 @@ export default function MeusPedidosPage() {
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
     const [exigenciaFiles, setExigenciaFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     
     const openDetailsModal = (request: UserRequest) => {
         setCurrentRequest(request);
@@ -89,14 +93,20 @@ export default function MeusPedidosPage() {
     const handleCumprirExigencia = async () => {
         if (!currentRequest || !userCpf || !storage) return;
         setIsUploading(true);
+        setUploadProgress(0);
 
         try {
             let documents: Document[] = [];
             if (exigenciaFiles.length > 0) {
-                const uploadPromises = exigenciaFiles.map(async (file) => {
-                    const downloadUrl = await uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`);
-                    return { name: file.name, url: downloadUrl };
-                });
+                const uploadPromises = exigenciaFiles.map(file => 
+                    uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`, (progress) => {
+                         // For simplicity, we'll show the progress of the first file.
+                         // A more complex UI could show progress for each file.
+                         if(file === exigenciaFiles[0]) {
+                            setUploadProgress(progress);
+                         }
+                    })
+                );
                 documents = await Promise.all(uploadPromises);
             }
 
@@ -117,6 +127,11 @@ export default function MeusPedidosPage() {
             
             await updateDoc(requestRef, payload);
             
+            toast({
+                title: "Exigência Cumprida!",
+                description: "Sua resposta foi enviada e o pedido está em reanálise."
+            });
+            
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
             setExigenciaFiles([]);
@@ -126,8 +141,14 @@ export default function MeusPedidosPage() {
 
         } catch (error) {
             console.error("Failed to update exigencia", error);
+            toast({
+                variant: "destructive",
+                title: "Falha no Envio",
+                description: "Não foi possível enviar sua resposta. Tente novamente."
+            });
         } finally {
             setIsUploading(false);
+            setUploadProgress(null);
         }
     };
     
@@ -182,7 +203,7 @@ export default function MeusPedidosPage() {
                                     <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {request.status === 'Exigência' && (
+                                    {request.status === 'Exigência' && !request.exigencia?.response && (
                                         <Button variant="outline" size="sm" onClick={(e) => {e.stopPropagation(); handleOpenExigencia(request)}}>
                                             <AlertTriangle className="mr-2 h-4 w-4" />
                                             Responder
@@ -227,7 +248,7 @@ export default function MeusPedidosPage() {
                                 <p className="text-muted-foreground">{formatDate(currentRequest.requestDate)}</p>
                             </div>
                             <div>
-                                <p className="font-semibold">Status</p>
+                                <div className="font-semibold">Status</div>
                                 <div><Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge></div>
                             </div>
                         </div>
@@ -385,12 +406,13 @@ export default function MeusPedidosPage() {
                                         value={exigenciaResponseText}
                                         onChange={(e) => setExigenciaResponseText(e.target.value)}
                                         rows={4}
+                                        disabled={isUploading}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="response-files" className="font-semibold">Anexar Documentos</Label>
                                     <div className="relative">
-                                        <Input type="file" id="response-files" className="pl-12" multiple onChange={handleFileChange} />
+                                        <Input type="file" id="response-files" className="pl-12" multiple onChange={handleFileChange} disabled={isUploading} />
                                         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                                             <Upload className="h-5 w-5 text-gray-400" />
                                         </div>
@@ -404,6 +426,12 @@ export default function MeusPedidosPage() {
                                         </div>
                                     )}
                                 </div>
+                                {uploadProgress !== null && (
+                                    <div className="space-y-2">
+                                        <Progress value={uploadProgress} className="w-full" />
+                                        <p className="text-sm text-center text-muted-foreground">{Math.round(uploadProgress)}%</p>
+                                    </div>
+                                )}
                             </Fragment>
                         )}
                          {currentRequest.exigencia.response && (
@@ -420,7 +448,7 @@ export default function MeusPedidosPage() {
                          {!currentRequest.exigencia.response && (
                             <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() || isUploading}>
                                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                Enviar Resposta
+                                {isUploading ? 'Enviando...' : 'Enviar Resposta'}
                             </AlertDialogAction>
                          )}
                     </AlertDialogFooter>
