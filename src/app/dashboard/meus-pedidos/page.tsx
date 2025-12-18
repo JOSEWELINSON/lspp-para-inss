@@ -93,13 +93,11 @@ export default function MeusPedidosPage() {
         setIsUploading(true);
 
         try {
-            let uploadedDocuments: Document[] = [];
-            if (filesToUpload.length > 0) {
-                const uploadPromises = filesToUpload.map(file => 
-                    uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`)
-                );
-                uploadedDocuments = await Promise.all(uploadPromises);
-            }
+            const uploadPromises = filesToUpload.map(file => {
+                const filePath = `requests/${currentRequest.id}/${file.name}`;
+                return uploadFile(storage, file, filePath);
+            });
+            const uploadedDocuments = await Promise.all(uploadPromises);
 
             const response = {
                 text: exigenciaResponseText,
@@ -238,7 +236,7 @@ export default function MeusPedidosPage() {
                                 <p className="text-muted-foreground">{formatDate(currentRequest.requestDate)}</p>
                             </div>
                             <div>
-                                <div className="font-semibold">Status</div>
+                                <p className="font-semibold">Status</p>
                                 <Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge>
                             </div>
                         </div>
@@ -407,9 +405,9 @@ export default function MeusPedidosPage() {
                                             <Upload className="h-5 w-5 text-gray-400" />
                                         </div>
                                     </div>
-                                    <FormDescription>
+                                    <p className="text-sm text-muted-foreground">
                                         Máx: 20MB por arquivo.
-                                    </FormDescription>
+                                    </p>
                                      {isUploading && (
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <Loader2 className="h-4 w-4 animate-spin" />
