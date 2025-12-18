@@ -81,6 +81,7 @@ export type UserRequest = {
     }
   },
   motivoIndeferimento?: string;
+  motivoDeferimento?: string;
 };
 
 export const mockUser = {

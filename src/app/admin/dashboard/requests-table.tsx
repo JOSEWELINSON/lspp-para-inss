@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, HeartHandshake } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, HeartHandshake, Info } from 'lucide-react';
 import { type RequestStatus, type UserRequest, type Documento } from '@/lib/data';
 import {
   AlertDialog,
@@ -118,10 +118,11 @@ export function AdminRequestsTable() {
     const requestsCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'requests') : null, [firestore]);
     const { data: allRequests, isLoading } = useCollection<UserRequest>(requestsCollectionRef);
     
-    const [modalState, setModalState] = useState<'details' | 'exigencia' | 'indeferimento' | null>(null);
+    const [modalState, setModalState] = useState<'details' | 'exigencia' | 'indeferimento' | 'deferimento' | null>(null);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaText, setExigenciaText] = useState("");
     const [indeferimentoMotivo, setIndeferimentoMotivo] = useState("");
+    const [deferimentoMotivo, setDeferimentoMotivo] = useState("");
 
     const sortedRequests = useMemo(() => {
         if (!allRequests) return [];
@@ -155,6 +156,11 @@ export function AdminRequestsTable() {
         if (newStatus === 'Indeferido') {
              setModalState('indeferimento');
              return;
+        }
+
+        if (newStatus === 'Deferido') {
+            setModalState('deferimento');
+            return;
         }
         
         const requestRef = doc(firestore, 'requests', requestId);
@@ -211,10 +217,30 @@ export function AdminRequestsTable() {
         setIndeferimentoMotivo("");
     };
 
+    const handleDeferimentoSubmit = async () => {
+        if (!currentRequest || !deferimentoMotivo || !firestore) return;
+
+        const requestRef = doc(firestore, 'requests', currentRequest.id);
+        const payload = {
+            status: 'Deferido' as RequestStatus,
+            motivoDeferimento: deferimentoMotivo
+        };
+
+        updateDoc(requestRef, payload)
+          .catch(error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: requestRef.path, operation: 'update', requestResourceData: payload }));
+          });
+
+        setCurrentRequest(prev => prev ? { ...prev, ...payload } : null);
+        setModalState('details');
+        setDeferimentoMotivo("");
+    };
+
     const closeModal = () => {
         setModalState(null);
         setExigenciaText("");
         setIndeferimentoMotivo("");
+        setDeferimentoMotivo("");
         setTimeout(() => setCurrentRequest(null), 300);
     }
     
@@ -288,6 +314,29 @@ export function AdminRequestsTable() {
                                 <Button variant="destructive" onClick={handleIndeferimentoSubmit} disabled={!indeferimentoMotivo.trim()}>Confirmar Indeferimento</Button>
                             </AlertDialogFooter>
                         </AlertDialogContent>
+                    ) : modalState === 'deferimento' ? (
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Deferir Solicitação</AlertDialogTitle>
+                                <AlertDialogDescription>Descreva o parecer ou observação para esta aprovação.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="deferimento-motivo">Parecer de Deferimento</Label>
+                                    <Textarea
+                                        id="deferimento-motivo"
+                                        placeholder="Ex: Documentação completa e requisitos atendidos conforme a legislação vigente..."
+                                        value={deferimentoMotivo}
+                                        onChange={(e) => setDeferimentoMotivo(e.target.value)}
+                                        rows={5}
+                                    />
+                                </div>
+                            </div>
+                            <AlertDialogFooter>
+                                <Button variant="ghost" onClick={() => { setModalState('details'); setDeferimentoMotivo(""); }}>Cancelar</Button>
+                                <Button onClick={handleDeferimentoSubmit} disabled={!deferimentoMotivo.trim()}>Confirmar Deferimento</Button>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
                     ) : (
                         <AlertDialogContent className="max-w-3xl">
                             <AlertDialogHeader>
@@ -332,6 +381,30 @@ export function AdminRequestsTable() {
                                         <p className="font-semibold">{currentRequest.benefitTitle}</p>
                                     </div>
                                 </div>
+
+                                {currentRequest.status === 'Deferido' && currentRequest.motivoDeferimento && (
+                                   <div className="space-y-2">
+                                        <h3 className="font-semibold flex items-center gap-2 text-green-600">
+                                            <Info />
+                                            Parecer de Deferimento
+                                        </h3>
+                                        <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
+                                            <p className="text-sm text-foreground italic">"{currentRequest.motivoDeferimento}"</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentRequest.status === 'Indeferido' && currentRequest.motivoIndeferimento && (
+                                   <div className="space-y-2">
+                                        <h3 className="font-semibold flex items-center gap-2 text-destructive">
+                                            <Info />
+                                            Motivo do Indeferimento
+                                        </h3>
+                                        <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded-r-lg">
+                                            <p className="text-sm text-foreground italic">"{currentRequest.motivoIndeferimento}"</p>
+                                        </div>
+                                    </div>
+                                )}
 
 
                                 {/* Initial Request Details */}

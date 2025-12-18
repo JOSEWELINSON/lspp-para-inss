@@ -326,6 +326,18 @@ export default function MeusPedidosPage() {
                             </div>
                         </div>
                         
+                        {currentRequest.status === 'Deferido' && currentRequest.motivoDeferimento && (
+                           <div className="space-y-2">
+                                <h3 className="font-semibold flex items-center gap-2 text-green-600">
+                                    <Info />
+                                    Parecer de Deferimento
+                                </h3>
+                                <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
+                                    <p className="text-sm text-foreground italic">"{currentRequest.motivoDeferimento}"</p>
+                                </div>
+                            </div>
+                        )}
+
                         {currentRequest.status === 'Indeferido' && currentRequest.motivoIndeferimento && (
                            <div className="space-y-2">
                                 <h3 className="font-semibold flex items-center gap-2 text-destructive">

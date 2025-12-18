@@ -147,6 +147,10 @@
         "motivoIndeferimento": {
             "type": "string",
             "description": "Reason for denial of the benefit application."
+        },
+        "motivoDeferimento": {
+            "type": "string",
+            "description": "Reason or observation for the approval of the benefit application."
         }
       },
       "required": [
