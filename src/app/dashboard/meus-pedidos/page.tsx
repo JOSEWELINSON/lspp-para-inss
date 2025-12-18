@@ -333,7 +333,7 @@ export default function MeusPedidosPage() {
                                     Motivo do Indeferimento
                                 </h3>
                                 <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded-r-lg">
-                                    <p className="text-sm text-destructive-foreground/90 italic">"{currentRequest.motivoIndeferimento}"</p>
+                                    <p className="text-sm text-foreground italic">"{currentRequest.motivoIndeferimento}"</p>
                                 </div>
                             </div>
                         )}
