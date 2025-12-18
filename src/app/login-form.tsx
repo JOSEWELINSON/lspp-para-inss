@@ -71,20 +71,23 @@ export function UserLoginForm() {
     }
 
     try {
+        // Step 1: Query for existing user by CPF
         const usersRef = collection(firestore, "users");
         const q = query(usersRef, where("cpf", "==", values.cpf), limit(1));
         const querySnapshot = await getDocs(q);
 
+        // Step 2: Sign in anonymously to get a stable, authenticated session UID for this login attempt.
         const userCredential = await signInAnonymously(auth);
         const authUser = userCredential.user;
 
         if (!querySnapshot.empty) {
             // User with this CPF exists
-            const userDoc = querySnapshot.docs[0];
-            const userData = userDoc.data() as UserProfile;
+            const existingUserDoc = querySnapshot.docs[0];
+            const existingUserData = existingUserDoc.data() as UserProfile;
 
-            if (userData.fullName.toLowerCase() !== values.fullName.toLowerCase()) {
-                await authUser.delete(); // Clean up the created anonymous user
+            // Step 3a: Validate full name
+            if (existingUserData.fullName.toLowerCase() !== values.fullName.toLowerCase()) {
+                await authUser.delete(); // Clean up the newly created anonymous user
                 toast({
                     variant: "destructive",
                     title: "Acesso Negado",
@@ -94,48 +97,40 @@ export function UserLoginForm() {
                 return;
             }
             
-            // If name matches, we need to associate the new anonymous auth user with the existing profile.
-            // A robust way would be a custom token, but for this prototype, we'll
-            // update the 'id' field in the existing document to the new authUser's UID.
-            // This is not ideal because it changes the document ID if we stored it by UID, 
-            // but our current logic finds the doc by CPF, so it's a workable solution.
-            
-            // To be more robust, we will create a new doc with the new UID and delete the old one.
-            const batch = writeBatch(firestore);
-            
-            const oldDocRef = doc(firestore, 'users', userDoc.id);
-            const newDocRef = doc(firestore, 'users', authUser.uid);
-            
-            // Check if the new doc ID already exists to avoid overwriting
-            const newDocSnap = await getDoc(newDocRef);
-            if (newDocSnap.exists()) {
-                // This case is unlikely with anonymous auth but good to handle.
-                // It means a user with this new UID already has a profile.
-                // We'll just proceed with login.
-            } else {
-                 const newProfileData: UserProfile = {
-                    ...userData, // copy existing data
-                    id: authUser.uid, // update the ID to the new auth UID
+            // Step 3b: User is validated. Now, ensure the current auth UID is linked to the profile.
+            // If the current auth UID is different from the one stored, we "migrate" the profile.
+            if (existingUserDoc.id !== authUser.uid) {
+                const batch = writeBatch(firestore);
+                
+                const oldDocRef = doc(firestore, 'users', existingUserDoc.id);
+                const newDocRef = doc(firestore, 'users', authUser.uid);
+                
+                const newProfileData: UserProfile = {
+                    ...existingUserData, // copy all data from the old profile
+                    id: authUser.uid,     // update the ID to the new auth UID
                 };
-                batch.set(newDocRef, newProfileData);
-                if (userDoc.id !== authUser.uid) { // Avoid deleting if IDs are the same
-                   batch.delete(oldDocRef);
-                }
+                
+                batch.set(newDocRef, newProfileData); // Create the new document with the new UID
+                batch.delete(oldDocRef);             // Delete the old document
+                
                 await batch.commit();
             }
             
-
             toast({
                 title: "Bem-vindo de volta!",
                 description: "Acessando seu painel de benefícios.",
             });
 
         } else {
-            // New user, create a profile using the new anonymous user's UID as the document ID
+            // Step 4: New user, create a profile using the new anonymous user's UID as the document ID
             const newUserProfile: UserProfile = {
                 id: authUser.uid,
                 cpf: values.cpf,
                 fullName: values.fullName,
+                email: "",
+                phone: "",
+                address: "",
+                birthDate: ""
             };
             const userRef = doc(firestore, "users", authUser.uid);
             await setDoc(userRef, newUserProfile);
@@ -151,12 +146,11 @@ export function UserLoginForm() {
     } catch (error: any) {
        console.error("Login/Signup Error: ", error);
        if (auth.currentUser) {
-           // We can try to sign out but if the user was just deleted it might fail
            try { await auth.signOut(); } catch(e) {}
        }
        toast({
         variant: "destructive",
-        title: "Erro",
+        title: "Erro no Login",
         description: error.message || "Não foi possível processar seu acesso. Tente novamente.",
       });
        setIsLoading(false);
