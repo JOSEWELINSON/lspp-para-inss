@@ -37,7 +37,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-1">
                 <h1 className="text-2xl font-bold tracking-tight lg:text-3xl font-headline">Solicitações de Benefícios</h1>
                 <p className="text-muted-foreground">
-                    Visualize e gerencie todas as solicitações pendentes e concluídas.
+                    Clique em uma solicitação para ver os detalhes e gerenciá-la.
                 </p>
             </div>
             <Card>
