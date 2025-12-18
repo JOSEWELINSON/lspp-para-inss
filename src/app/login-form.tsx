@@ -23,8 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
 
 const formSchema = z.object({
-  cpf: z.string().min(1, { message: "CPF é obrigatório." }),
-  password: z.string().min(1, { message: "Senha é obrigatória." }),
+  fullName: z.string().min(1, { message: "Nome completo é obrigatório." }),
+  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, { message: "CPF inválido. Use o formato 000.000.000-00." }),
 });
 
 export function UserLoginForm() {
@@ -35,30 +35,46 @@ export function UserLoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      fullName: "",
       cpf: "",
-      password: "",
     },
   });
+  
+  // Mask for CPF
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 11) {
+      value = value.substring(0, 11);
+    }
+    value = value.replace(/(\d{3})(\d)/, "$1.$2");
+    value = value.replace(/(\d{3})(\d)/, "$1.$2");
+    value = value.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    form.setValue("cpf", value);
+  };
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // Simulate API call
+    // Here would be the logic to check if the user exists
+    // For now, we'll just simulate a successful login
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // For demonstration, any non-empty input is considered valid
-    if (values.cpf && values.password) {
+    // For demonstration, we'll store the user info in localStorage
+    // In a real app, this would involve a backend and session management
+    try {
+      localStorage.setItem("user", JSON.stringify(values));
       toast({
-        title: "Login bem-sucedido!",
+        title: "Acesso realizado com sucesso!",
         description: "Redirecionando para o seu painel.",
       });
       router.push("/dashboard");
-    } else {
-      toast({
+    } catch (error) {
+       toast({
         variant: "destructive",
-        title: "Erro no Login",
-        description: "CPF ou senha inválidos.",
+        title: "Erro",
+        description: "Não foi possível salvar os dados do usuário no seu navegador.",
       });
-      setIsLoading(false);
+       setIsLoading(false);
     }
   }
 
@@ -70,20 +86,20 @@ export function UserLoginForm() {
         </div>
         <CardTitle className="text-2xl font-bold">Acesse sua Conta</CardTitle>
         <CardDescription>
-          Entre com seu CPF e senha para gerenciar seus benefícios.
+          Entre com seu nome completo e CPF para gerenciar seus benefícios.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
+          <FormField
               control={form.control}
-              name="cpf"
+              name="fullName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>CPF</FormLabel>
+                  <FormLabel>Nome Completo</FormLabel>
                   <FormControl>
-                    <Input placeholder="000.000.000-00" {...field} />
+                    <Input placeholder="Seu nome completo" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -91,12 +107,12 @@ export function UserLoginForm() {
             />
             <FormField
               control={form.control}
-              name="password"
+              name="cpf"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Senha</FormLabel>
+                  <FormLabel>CPF</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Sua senha" {...field} />
+                    <Input placeholder="000.000.000-00" {...field} onChange={handleCpfChange} value={field.value} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

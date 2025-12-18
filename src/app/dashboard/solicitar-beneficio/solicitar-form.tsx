@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { benefits } from "@/lib/data";
+import { benefits, type UserRequest } from "@/lib/data";
 
 const formSchema = z.object({
   benefitId: z.string({ required_error: "Por favor, selecione um benefício." }),
@@ -38,10 +38,27 @@ const formSchema = z.object({
   documents: z.any().optional(),
 });
 
+type User = {
+    fullName: string;
+    cpf: string;
+}
+
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    try {
+        const userData = localStorage.getItem('user');
+        if(userData) {
+            setUser(JSON.parse(userData));
+        }
+    } catch(e) {
+        // ignore
+    }
+  }, [])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,16 +68,57 @@ export function SolicitarBeneficioForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!user) {
+        toast({
+            variant: 'destructive',
+            title: "Erro de Autenticação",
+            description: "Usuário não encontrado. Faça o login novamente.",
+        });
+        router.push('/');
+        return;
+    }
+
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    toast({
-      title: "Solicitação Enviada com Sucesso!",
-      description: "Seu pedido foi registrado e está em análise. Protocolo: 202405-006",
-    });
+    const protocol = `2024${Date.now().toString().slice(-6)}`;
+    const selectedBenefit = benefits.find(b => b.id === values.benefitId);
 
-    setIsLoading(false);
-    router.push("/dashboard/meus-pedidos");
+    const newRequest: UserRequest = {
+        id: new Date().toISOString(),
+        protocol,
+        benefitTitle: selectedBenefit?.title || 'Benefício Desconhecido',
+        requestDate: new Date().toISOString(),
+        status: 'Em análise',
+        user: {
+            name: user.fullName,
+            cpf: user.cpf,
+        }
+    };
+    
+    try {
+        const existingRequestsRaw = localStorage.getItem('myRequests');
+        const existingRequests: UserRequest[] = existingRequestsRaw ? JSON.parse(existingRequestsRaw) : [];
+        const updatedRequests = [...existingRequests, newRequest];
+        localStorage.setItem('myRequests', JSON.stringify(updatedRequests));
+
+        toast({
+          title: "Solicitação Enviada com Sucesso!",
+          description: `Seu pedido foi registrado e está em análise. Protocolo: ${protocol}`,
+        });
+
+        setIsLoading(false);
+        router.push("/dashboard/meus-pedidos");
+
+    } catch (error) {
+        console.error("Failed to save request", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao Salvar Solicitação",
+          description: "Não foi possível registrar seu pedido. Tente novamente.",
+        });
+        setIsLoading(false);
+    }
   }
 
   return (

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -25,7 +26,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Logo } from '@/components/logo';
-import { mockUser } from '@/lib/data';
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
@@ -36,31 +36,68 @@ const navItems = [
   { href: '/dashboard/perfil', label: 'Meu Perfil', icon: User },
 ];
 
+type User = {
+    fullName: string;
+    cpf: string;
+}
+
 function UserMenu() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="secondary" size="icon" className="rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={`https://avatar.vercel.sh/${mockUser.email}.png`} alt={mockUser.name} />
-            <AvatarFallback>{mockUser.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <span className="sr-only">Toggle user menu</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{mockUser.name}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-            <Link href="/dashboard/perfil">Perfil</Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-            <Link href="/">Sair</Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+    const router = useRouter();
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        try {
+            const userData = localStorage.getItem('user');
+            if (userData) {
+                setUser(JSON.parse(userData));
+            } else {
+                router.push('/');
+            }
+        } catch (error) {
+            router.push('/');
+        }
+    }, [router]);
+
+    const handleLogout = () => {
+        try {
+            localStorage.removeItem('user');
+        } catch (error) {
+            console.error("Failed to remove user from local storage", error);
+        }
+        router.push('/');
+    };
+
+    if (!user) {
+        return null;
+    }
+
+    const nameInitial = user.fullName ? user.fullName.charAt(0).toUpperCase() : '?';
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="icon" className="rounded-full">
+                <Avatar className="h-8 w-8">
+                    {/* The avatar service is based on email, we don't have it, so we use a fallback */}
+                    <AvatarFallback>{nameInitial}</AvatarFallback>
+                </Avatar>
+                <span className="sr-only">Toggle user menu</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{user.fullName}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <Link href="/dashboard/perfil">Perfil</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
 }
 
 function NavLinks() {
@@ -86,6 +123,17 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  useEffect(() => {
+    try {
+        if (!localStorage.getItem('user')) {
+            router.push('/');
+        }
+    } catch (error) {
+        router.push('/');
+    }
+  }, [router]);
+
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-card md:block">

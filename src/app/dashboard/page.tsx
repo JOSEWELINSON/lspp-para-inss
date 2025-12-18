@@ -1,4 +1,6 @@
+'use client';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   FileText,
@@ -22,8 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { myRequests, mockUser } from '@/lib/data';
-import type { RequestStatus } from '@/lib/data';
+import type { RequestStatus, UserRequest } from '@/lib/data';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -33,14 +34,38 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
+type User = {
+  fullName: string;
+  cpf: string;
+}
 
 export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null);
+  const [myRequests, setMyRequests] = useState<UserRequest[]>([]);
+
+  useEffect(() => {
+    try {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            setUser(JSON.parse(userData));
+        }
+
+        const requestsData = localStorage.getItem('myRequests');
+        if(requestsData){
+            setMyRequests(JSON.parse(requestsData));
+        }
+    } catch(error) {
+        // Could not parse user, will be redirected by layout
+    }
+  }, []);
+
   const recentRequests = myRequests.slice(0, 3);
+  const name = user ? user.fullName.split(' ')[0] : '';
   return (
     <div className="flex flex-col gap-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight lg:text-3xl font-headline">
-          Bem-vindo, {mockUser.name.split(' ')[0]}!
+          Bem-vindo, {name}!
         </h1>
         <p className="text-muted-foreground">
           Aqui está um resumo de suas atividades e benefícios.
@@ -111,7 +136,7 @@ export default function DashboardPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {recentRequests.map((request) => (
+                        {recentRequests.length > 0 ? recentRequests.map((request) => (
                             <TableRow key={request.id}>
                                 <TableCell className="font-medium">{request.benefitTitle}</TableCell>
                                 <TableCell>{request.protocol}</TableCell>
@@ -120,7 +145,11 @@ export default function DashboardPage() {
                                     <Badge variant={statusVariant[request.status] || 'secondary'}>{request.status}</Badge>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center h-24">Nenhuma solicitação recente.</TableCell>
+                          </TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>

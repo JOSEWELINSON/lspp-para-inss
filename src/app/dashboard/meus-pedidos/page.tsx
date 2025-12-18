@@ -1,3 +1,6 @@
+'use client';
+import { useEffect, useState } from 'react';
+
 import {
   Table,
   TableBody,
@@ -8,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { myRequests, type RequestStatus } from '@/lib/data';
+import { type RequestStatus, type UserRequest } from '@/lib/data';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -28,6 +31,19 @@ const statusColorClasses: Record<RequestStatus, string> = {
 
 
 export default function MeusPedidosPage() {
+    const [myRequests, setMyRequests] = useState<UserRequest[]>([]);
+
+    useEffect(() => {
+        try {
+            const requestsData = localStorage.getItem('myRequests');
+            if(requestsData){
+                setMyRequests(JSON.parse(requestsData));
+            }
+        } catch(error) {
+            console.error("Failed to load requests from local storage", error);
+        }
+    }, []);
+
   return (
     <div className="space-y-6">
         <div>
@@ -49,7 +65,7 @@ export default function MeusPedidosPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {myRequests.map((request) => (
+                        {myRequests.length > 0 ? myRequests.map((request) => (
                             <TableRow key={request.id}>
                                 <TableCell className="hidden sm:table-cell">
                                     <div className={`w-3 h-3 rounded-full ${statusColorClasses[request.status]}`}></div>
@@ -65,7 +81,13 @@ export default function MeusPedidosPage() {
                                     <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    Você ainda não fez nenhuma solicitação.
+                                </TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>

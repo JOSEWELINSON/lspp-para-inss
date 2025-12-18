@@ -51,71 +51,11 @@ export type UserRequest = {
   }
 };
 
-export const userRequests: UserRequest[] = [
-    {
-        id: '1',
-        protocol: '202401-001',
-        benefitTitle: 'Auxílio por Incapacidade Temporária',
-        requestDate: '2024-05-10',
-        status: 'Em análise',
-        user: {
-            name: 'João da Silva',
-            cpf: '123.456.789-00'
-        }
-    },
-    {
-        id: '2',
-        protocol: '202401-002',
-        benefitTitle: 'Aposentadoria por Idade',
-        requestDate: '2024-05-08',
-        status: 'Exigência',
-        user: {
-            name: 'Maria Oliveira',
-            cpf: '987.654.321-00'
-        }
-    },
-    {
-        id: '3',
-        protocol: '202401-003',
-        benefitTitle: 'Salário-Maternidade',
-        requestDate: '2024-04-20',
-        status: 'Deferido',
-        user: {
-            name: 'Ana Souza',
-            cpf: '111.222.333-44'
-        }
-    },
-    {
-        id: '4',
-        protocol: '202401-004',
-        benefitTitle: 'Pensão por Morte',
-        requestDate: '2024-03-15',
-        status: 'Indeferido',
-        user: {
-            name: 'Carlos Pereira',
-            cpf: '555.666.777-88'
-        }
-    },
-    {
-        id: '5',
-        protocol: '202401-005',
-        benefitTitle: 'Auxílio por Incapacidade Temporária',
-        requestDate: '2024-05-12',
-        status: 'Compareça presencialmente',
-        user: {
-            name: 'Juliana Costa',
-            cpf: '999.888.777-66'
-        }
-    }
-];
-
 export const mockUser = {
-  name: "João da Silva",
-  email: "joao.silva@example.com",
-  cpf: "123.456.789-00",
-  birthDate: "1980-01-15",
-  phone: "(11) 98765-4321",
-  address: "Rua das Flores, 123, São Paulo, SP",
+  name: "Usuário",
+  email: "usuario@example.com",
+  cpf: "000.000.000-00",
+  birthDate: "1990-01-01",
+  phone: "(00) 00000-0000",
+  address: "Endereço do usuário",
 };
-
-export const myRequests: UserRequest[] = userRequests.filter(r => r.user.cpf === mockUser.cpf);

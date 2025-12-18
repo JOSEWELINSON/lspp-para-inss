@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { userRequests as initialRequests, type RequestStatus, type UserRequest } from '@/lib/data';
+import { type RequestStatus, type UserRequest } from '@/lib/data';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -33,14 +33,29 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
 const allStatuses: RequestStatus[] = ['Em análise', 'Exigência', 'Deferido', 'Indeferido', 'Compareça presencialmente'];
 
 export function AdminRequestsTable() {
-    const [requests, setRequests] = useState<UserRequest[]>(initialRequests);
+    const [requests, setRequests] = useState<UserRequest[]>([]);
+
+    useEffect(() => {
+        try {
+            const allRequests = localStorage.getItem('myRequests');
+            if (allRequests) {
+                setRequests(JSON.parse(allRequests));
+            }
+        } catch (error) {
+            console.error("Failed to load requests for admin", error);
+        }
+    }, []);
 
     const handleStatusChange = (requestId: string, newStatus: RequestStatus) => {
-        setRequests(prevRequests => 
-            prevRequests.map(req => 
-                req.id === requestId ? { ...req, status: newStatus } : req
-            )
+        const updatedRequests = requests.map(req => 
+            req.id === requestId ? { ...req, status: newStatus } : req
         );
+        setRequests(updatedRequests);
+        try {
+            localStorage.setItem('myRequests', JSON.stringify(updatedRequests));
+        } catch (error) {
+            console.error("Failed to save request status", error);
+        }
     };
 
     return (
