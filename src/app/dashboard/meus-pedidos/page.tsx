@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, Fragment, ChangeEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -309,8 +310,8 @@ export default function MeusPedidosPage() {
                     </AlertDialogHeader>
 
                     <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-6 -mr-6">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                            <div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div className="md:col-span-3">
                                 <p className="font-semibold">Benefício Solicitado</p>
                                 <p className="text-muted-foreground">{currentRequest.benefitTitle}</p>
                             </div>
@@ -318,7 +319,7 @@ export default function MeusPedidosPage() {
                                 <p className="font-semibold">Data</p>
                                 <p className="text-muted-foreground">{formatDate(currentRequest.requestDate)}</p>
                             </div>
-                             <div>
+                             <div className="md:col-span-2">
                                 <p className="font-semibold">Status</p>
                                 <div>
                                     <Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge>
@@ -575,3 +576,5 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
+
+    

@@ -40,6 +40,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCollection, useFirestore, useMemoFirebase, FirestorePermissionError, errorEmitter } from '@/firebase';
 import { collection, doc, updateDoc } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -85,30 +86,54 @@ function RequestsList({ requests, onRowClick, isLoading }: { requests: UserReque
     }
     
     return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Segurado</TableHead>
-                    <TableHead>CPF</TableHead>
-                    <TableHead>Benefício Solicitado</TableHead>
-                    <TableHead>Protocolo</TableHead>
-                    <TableHead>Status Atual</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
+        <Fragment>
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Segurado</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Benefício Solicitado</TableHead>
+                            <TableHead>Protocolo</TableHead>
+                            <TableHead>Status Atual</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {requests.map((request) => (
+                            <TableRow key={request.id} onClick={() => onRowClick(request)} className="cursor-pointer">
+                                <TableCell className="font-medium">{request.user.name}</TableCell>
+                                <TableCell>{request.user.cpf}</TableCell>
+                                <TableCell>{request.benefitTitle}</TableCell>
+                                <TableCell>{request.protocol}</TableCell>
+                                <TableCell>
+                                    <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4 p-4">
                 {requests.map((request) => (
-                    <TableRow key={request.id} onClick={() => onRowClick(request)} className="cursor-pointer">
-                        <TableCell className="font-medium">{request.user.name}</TableCell>
-                        <TableCell>{request.user.cpf}</TableCell>
-                        <TableCell>{request.benefitTitle}</TableCell>
-                        <TableCell>{request.protocol}</TableCell>
-                        <TableCell>
+                    <Card key={request.id} onClick={() => onRowClick(request)} className="cursor-pointer">
+                        <CardHeader>
+                            <CardTitle className="text-base">{request.benefitTitle}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                            <p><strong>Segurado:</strong> {request.user.name}</p>
+                            <p><strong>CPF:</strong> {request.user.cpf}</p>
+                            <p><strong>Protocolo:</strong> {request.protocol}</p>
+                        </CardContent>
+                        <CardFooter>
                             <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
-                        </TableCell>
-                    </TableRow>
+                        </CardFooter>
+                    </Card>
                 ))}
-            </TableBody>
-        </Table>
+            </div>
+        </Fragment>
     );
 }
 
@@ -351,8 +376,8 @@ export function AdminRequestsTable() {
 
                             <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-6 -mr-6">
                                 {/* Request Info */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                    <div>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                                    <div className="md:col-span-2">
                                         <p className="font-semibold">Segurado</p>
                                         <p className="text-muted-foreground">{currentRequest.user.name}</p>
                                     </div>
@@ -364,8 +389,8 @@ export function AdminRequestsTable() {
                                         <p className="font-semibold">Protocolo</p>
                                         <p className="text-muted-foreground">{currentRequest.protocol}</p>
                                     </div>
-                                    <div>
-                                        <p className="font-semibold">Data</p>
+                                    <div className="md:col-span-2">
+                                        <p className="font-semibold">Data da Solicitação</p>
                                         <p className="text-muted-foreground">{formatDate(currentRequest.requestDate)}</p>
                                     </div>
                                 </div>
@@ -491,16 +516,16 @@ export function AdminRequestsTable() {
                                 </div>
                             </div>
 
-                            <AlertDialogFooter className="flex items-center justify-between w-full pt-4">
+                            <AlertDialogFooter className="flex-col md:flex-row items-center justify-between w-full pt-4 gap-2">
                                <div className="flex items-center gap-2">
                                  <span className="text-sm font-medium">Status:</span>
                                  <Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge>
                                </div>
-                               <div className="flex gap-2">
-                                    <AlertDialogCancel onClick={closeModal}>Fechar</AlertDialogCancel>
+                               <div className="flex gap-2 w-full md:w-auto">
+                                    <AlertDialogCancel onClick={closeModal} className="w-full">Fechar</AlertDialogCancel>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button>
+                                            <Button className="w-full">
                                                 Despachar
                                                 <MoreHorizontal className="ml-2 h-4 w-4" />
                                             </Button>
@@ -529,5 +554,7 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
+
+    
 
     
