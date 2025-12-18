@@ -49,6 +49,13 @@ export function SolicitarBeneficioForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
 
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      description: "",
+    },
+  });
+
   useEffect(() => {
     try {
         const currentUserCpf = localStorage.getItem('currentUserCpf');
@@ -72,17 +79,9 @@ export function SolicitarBeneficioForm() {
     }
   }, [router]);
   
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      description: "",
-    },
-  });
-  
   const fileRef = form.register("documents");
 
-
-  async function onSubmit(values: z.infer<typeof formSchema>>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
         toast({
             variant: 'destructive',
