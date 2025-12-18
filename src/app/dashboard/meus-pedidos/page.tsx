@@ -137,11 +137,11 @@ export default function MeusPedidosPage() {
                     });
                 }
             } else if (file.type === 'application/pdf') {
-                 if (file.size > 1024 * 1024) {
+                 if (file.size > 1024 * 1024 * 2) { // 2MB limit for PDFs
                     toast({
                         variant: "destructive",
                         title: "Arquivo PDF Muito Grande",
-                        description: `O arquivo "${file.name}" excede 1MB e não pode ser enviado.`,
+                        description: `O arquivo "${file.name}" excede 2MB e não pode ser enviado.`,
                     });
                 } else {
                     processedFiles.push(file);
@@ -516,7 +516,7 @@ export default function MeusPedidosPage() {
                                          accept="image/*,application/pdf"
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Imagens serão comprimidas e convertidas para PDF. PDFs devem ser menores que 1MB.
+                                         Imagens são convertidas para PDF. PDFs devem ter menos de 2MB.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (
