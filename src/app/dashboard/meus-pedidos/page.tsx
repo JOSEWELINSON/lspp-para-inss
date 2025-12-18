@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
 import {
@@ -29,6 +29,8 @@ import {
 import { type RequestStatus, type UserRequest } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -113,7 +115,6 @@ export default function MeusPedidosPage() {
         try {
             const appDataRaw = localStorage.getItem('appData');
             const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
-            // Find and update the specific requests for the logged-in user
             const currentUserCpf = localStorage.getItem('currentUserCpf');
             const otherUserRequests = appData.requests.filter((r: UserRequest) => r.user.cpf !== currentUserCpf);
             appData.requests = [...otherUserRequests, ...updatedRequests];
@@ -196,76 +197,85 @@ export default function MeusPedidosPage() {
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Protocolo: {currentRequest.protocol}
-                            <br />
-                            Prazo para cumprimento: <strong>{getPrazoExigencia(currentRequest.exigencia.createdAt)}</strong>
+                            {' | '}
+                            Prazo: <strong>{getPrazoExigencia(currentRequest.exigencia.createdAt)}</strong>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     
-                    <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4">
-                        <Card className="bg-muted/50">
-                            <CardHeader>
-                                <CardTitle className="text-base">Descrição da Exigência do INSS</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-muted-foreground">{currentRequest.exigencia.text}</p>
-                            </CardContent>
-                        </Card>
-                        
-                        <div className="space-y-4">
-                            <Label htmlFor="response-text" className="font-semibold">Sua Resposta</Label>
-                            <Textarea
-                                id="response-text"
-                                placeholder="Escreva uma resposta para o servidor do INSS..."
-                                value={exigenciaResponseText}
-                                onChange={(e) => setExigenciaResponseText(e.target.value)}
-                                rows={4}
-                                disabled={!!currentRequest.exigencia.response}
-                            />
-                        </div>
-
-                        <div className="space-y-4">
-                            <Label htmlFor="response-files" className="font-semibold">Anexar Documentos (PDF, JPG, PNG)</Label>
-                             <div className="relative">
-                                <Input 
-                                    type="file" 
-                                    id="response-files" 
-                                    className="pl-12" 
-                                    multiple 
-                                    onChange={handleFileChange} 
-                                    disabled={!!currentRequest.exigencia.response}
-                                />
-                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                    <Upload className="h-5 w-5 text-gray-400" />
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 -mr-4">
+                        {/* Server message */}
+                        <div className="flex gap-3">
+                            <Avatar className="h-8 w-8 border-2 border-primary">
+                                <AvatarFallback className="bg-primary text-primary-foreground">
+                                    <ShieldCheck className="h-5 w-5" />
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 space-y-1">
+                                <div className="bg-muted rounded-lg p-3">
+                                    <p className="text-sm text-foreground">{currentRequest.exigencia.text}</p>
                                 </div>
+                                <p className="text-xs text-muted-foreground">INSS em {new Date(currentRequest.exigencia.createdAt).toLocaleDateString('pt-BR')}</p>
                             </div>
-                            {exigenciaFiles.length > 0 && (
-                                <div className="text-sm text-muted-foreground">
-                                    <p>Arquivos selecionados:</p>
-                                    <ul className="list-disc pl-5">
-                                        {exigenciaFiles.map(file => <li key={file.name}>{file.name}</li>)}
-                                    </ul>
-                                </div>
-                            )}
                         </div>
 
-                        {currentRequest.exigencia.response && (
-                             <Card className="bg-green-50 border-green-200">
-                                <CardHeader>
-                                    <CardTitle className="text-base text-green-800">Você já respondeu a esta exigência</CardTitle>
-                                    <CardDescription>
-                                        Sua resposta foi enviada em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}. Aguarde a reanálise.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-2 text-sm">
-                                    <p><strong>Sua resposta:</strong> {currentRequest.exigencia.response.text}</p>
-                                    {currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0 && (
-                                         <div>
-                                            <strong>Arquivos enviados:</strong>
+                        {currentRequest.exigencia.response ? (
+                             // User response - already sent
+                            <div className="flex gap-3">
+                                <div className="flex-1 space-y-1 text-right">
+                                    <div className="bg-primary text-primary-foreground rounded-lg p-3 inline-block text-left">
+                                        <p className="text-sm">{currentRequest.exigencia.response.text}</p>
+                                        {currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0 && (
+                                            <div className="mt-2 text-xs border-t border-primary-foreground/50 pt-2">
+                                                <p className="font-semibold">Arquivos enviados:</p>
+                                                <ul className="list-disc pl-4">
+                                                    {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Você em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}</p>
+                                </div>
+                                <Avatar className="h-8 w-8">
+                                    <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>
+                                </Avatar>
+                            </div>
+                        ) : (
+                            // User response form
+                            <Fragment>
+                                <Separator className="my-4" />
+                                <div className="space-y-4">
+                                    <Label htmlFor="response-text" className="font-semibold">Sua Resposta</Label>
+                                    <Textarea
+                                        id="response-text"
+                                        placeholder="Escreva uma resposta para o servidor do INSS..."
+                                        value={exigenciaResponseText}
+                                        onChange={(e) => setExigenciaResponseText(e.target.value)}
+                                        rows={4}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="response-files" className="font-semibold">Anexar Documentos</Label>
+                                    <div className="relative">
+                                        <Input type="file" id="response-files" className="pl-12" multiple onChange={handleFileChange} />
+                                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                            <Upload className="h-5 w-5 text-gray-400" />
+                                        </div>
+                                    </div>
+                                    {exigenciaFiles.length > 0 && (
+                                        <div className="text-sm text-muted-foreground">
+                                            <p>Arquivos selecionados:</p>
                                             <ul className="list-disc pl-5">
-                                                {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
+                                                {exigenciaFiles.map(file => <li key={file.name}>{file.name}</li>)}
                                             </ul>
                                         </div>
                                     )}
+                                </div>
+                            </Fragment>
+                        )}
+                         {currentRequest.exigencia.response && (
+                             <Card className="bg-green-50 border-green-200 mt-4">
+                                <CardContent className="p-3">
+                                    <p className="text-sm text-green-800">Você já respondeu a esta exigência. Sua solicitação está em reanálise.</p>
                                 </CardContent>
                             </Card>
                         )}
