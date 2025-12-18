@@ -15,7 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -166,6 +166,7 @@ export default function DashboardLayout({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
+              <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
               <nav className="grid gap-2 text-lg font-medium">
                 <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <Logo />
