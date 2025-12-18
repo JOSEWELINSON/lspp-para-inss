@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { benefits, type UserRequest } from "@/lib/data";
+import { benefits, type UserRequest, type Document } from "@/lib/data";
 
 const formSchema = z.object({
   benefitId: z.string({ required_error: "Por favor, selecione um benefício." }),
@@ -43,6 +43,15 @@ type User = {
     cpf: string;
 }
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
@@ -55,6 +64,8 @@ export function SolicitarBeneficioForm() {
       description: "",
     },
   });
+  
+  const fileRef = form.register("documents");
 
   useEffect(() => {
     try {
@@ -79,8 +90,6 @@ export function SolicitarBeneficioForm() {
     }
   }, [router]);
   
-  const fileRef = form.register("documents");
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
         toast({
@@ -93,13 +102,30 @@ export function SolicitarBeneficioForm() {
     }
 
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
     
     const protocol = `2024${Date.now().toString().slice(-6)}`;
     const selectedBenefit = benefits.find(b => b.id === values.benefitId);
     
     const documentFiles = values.documents as FileList | null;
-    const documentNames = documentFiles ? Array.from(documentFiles).map(file => file.name) : [];
+    const documents: Document[] = [];
+
+    if (documentFiles) {
+        for (const file of Array.from(documentFiles)) {
+            try {
+                const url = await fileToBase64(file);
+                documents.push({ name: file.name, url });
+            } catch (error) {
+                console.error("Error converting file to Base64", error);
+                toast({
+                    variant: "destructive",
+                    title: `Erro ao processar o arquivo ${file.name}`,
+                    description: "Tente novamente ou escolha outro arquivo.",
+                });
+                setIsLoading(false);
+                return;
+            }
+        }
+    }
 
     const newRequest: UserRequest = {
         id: new Date().toISOString(),
@@ -108,7 +134,7 @@ export function SolicitarBeneficioForm() {
         requestDate: new Date().toISOString(),
         status: 'Em análise',
         description: values.description,
-        documents: documentNames,
+        documents: documents,
         user: {
             name: user.fullName,
             cpf: user.cpf,
@@ -119,7 +145,7 @@ export function SolicitarBeneficioForm() {
         const appDataRaw = localStorage.getItem('appData');
         const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
         
-        appData.requests.push(newRequest);
+        appData.requests.unshift(newRequest);
         localStorage.setItem('appData', JSON.stringify(appData));
 
         toast({

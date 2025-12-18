@@ -65,7 +65,7 @@ export function AdminRequestsTable() {
             const appDataRaw = localStorage.getItem('appData');
             if (appDataRaw) {
                 const appData = JSON.parse(appDataRaw);
-                setAllRequests(appData.requests || []);
+                setAllRequests((appData.requests || []).sort((a:UserRequest, b:UserRequest) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()));
             }
         } catch (error) {
             console.error("Failed to load requests for admin", error);
@@ -101,7 +101,7 @@ export function AdminRequestsTable() {
             setIsExigenciaSubmitting(true);
         } else {
             const updatedRequests = allRequests.map(req => 
-                req.id === requestId ? { ...req, status: newStatus } : req
+                req.id === requestId ? { ...req, status: newStatus, exigencia: newStatus !== 'Exigência' ? req.exigencia : req.exigencia ? {...req.exigencia, response: undefined} : undefined } : req
             );
             setAllRequests(updatedRequests);
             updateRequestsInStorage(updatedRequests);
@@ -237,7 +237,7 @@ export function AdminRequestsTable() {
                                             <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
                                                 {currentRequest.documents.map((doc, i) => (
                                                     <li key={i}>
-                                                        <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{doc}</a>
+                                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{doc.name}</a>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -302,7 +302,7 @@ export function AdminRequestsTable() {
                                                                 <ul className="list-disc pl-4">
                                                                     {currentRequest.exigencia.response.files.map((file, i) => (
                                                                         <li key={i}>
-                                                                            <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file}</a>
+                                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file.name}</a>
                                                                         </li>
                                                                     ))}
                                                                 </ul>
@@ -362,9 +362,3 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
-
-    
-
-    
-
-    

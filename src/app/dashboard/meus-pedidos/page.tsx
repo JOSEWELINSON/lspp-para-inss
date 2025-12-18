@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { type RequestStatus, type UserRequest } from '@/lib/data';
+import { type RequestStatus, type UserRequest, type Document } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -41,6 +41,16 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Indeferido': 'destructive',
     'Compareça presencialmente': 'default'
 };
+
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
 
 export default function MeusPedidosPage() {
     const router = useRouter();
@@ -91,7 +101,7 @@ export default function MeusPedidosPage() {
         }
     };
 
-    const handleCumprirExigencia = () => {
+    const handleCumprirExigencia = async () => {
         if (!currentRequest) return;
 
         try {
@@ -100,6 +110,12 @@ export default function MeusPedidosPage() {
 
             const appData = JSON.parse(appDataRaw);
             
+            const documents: Document[] = [];
+            for (const file of exigenciaFiles) {
+                const url = await fileToBase64(file);
+                documents.push({ name: file.name, url });
+            }
+
             const updatedRequests = appData.requests.map((req: UserRequest) => {
                 if (req.id === currentRequest.id && req.exigencia) {
                     return {
@@ -109,7 +125,7 @@ export default function MeusPedidosPage() {
                             ...req.exigencia,
                             response: {
                                 text: exigenciaResponseText,
-                                files: exigenciaFiles.map(f => f.name),
+                                files: documents,
                                 respondedAt: new Date().toISOString(),
                             }
                         }
@@ -125,7 +141,10 @@ export default function MeusPedidosPage() {
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
             setExigenciaFiles([]);
-            setCurrentRequest(null);
+            const updatedCurrentRequest = updatedRequests.find((req: UserRequest) => req.id === currentRequest.id);
+            setCurrentRequest(updatedCurrentRequest || null);
+            setIsDetailsModalOpen(!!updatedCurrentRequest);
+
         } catch (error) {
             console.error("Failed to update exigencia", error);
         }
@@ -252,7 +271,7 @@ export default function MeusPedidosPage() {
                                                             <ul className="list-disc pl-4">
                                                                 {currentRequest.exigencia.response.files.map((file, i) => (
                                                                     <li key={i}>
-                                                                        <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file}</a>
+                                                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file.name}</a>
                                                                     </li>
                                                                 ))}
                                                             </ul>
@@ -341,7 +360,7 @@ export default function MeusPedidosPage() {
                                                 <ul className="list-disc pl-4">
                                                     {currentRequest.exigencia.response.files.map((file, i) => (
                                                          <li key={i}>
-                                                            <a href="#" target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file}</a>
+                                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary-foreground hover:underline">{file.name}</a>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -410,7 +429,3 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
-
-    
-
-    

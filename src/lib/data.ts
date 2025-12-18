@@ -39,6 +39,11 @@ export const benefits: Benefit[] = [
 
 export type RequestStatus = 'Em análise' | 'Exigência' | 'Deferido' | 'Indeferido' | 'Compareça presencialmente';
 
+export type Document = {
+  name: string;
+  url: string; // Base64 Data URL
+}
+
 export type UserRequest = {
   id: string;
   protocol: string;
@@ -46,7 +51,7 @@ export type UserRequest = {
   requestDate: string;
   status: RequestStatus;
   description: string;
-  documents: string[];
+  documents: Document[];
   user: {
     name: string;
     cpf: string;
@@ -56,7 +61,7 @@ export type UserRequest = {
     createdAt: string;
     response?: {
       text: string;
-      files: string[];
+      files: Document[];
       respondedAt: string;
     }
   }
@@ -70,5 +75,3 @@ export const mockUser = {
   phone: "(00) 00000-0000",
   address: "Endereço do usuário",
 };
-
-    
