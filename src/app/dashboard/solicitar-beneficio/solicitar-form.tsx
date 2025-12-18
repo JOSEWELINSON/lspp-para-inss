@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Loader2, Upload, File as FileIcon, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 import imageCompression from "browser-image-compression";
+import jsPDF from 'jspdf';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,12 +94,33 @@ export function SolicitarBeneficioForm() {
                     useWebWorker: true,
                 };
                 const compressedFile = await imageCompression(file, options);
-                processedFiles.push(compressedFile);
+                
+                const pdf = new jsPDF();
+                const imgData = await fileToDataUrl(compressedFile);
+                const img = new Image();
+                img.src = imgData;
+                await new Promise(resolve => { img.onload = resolve; });
+
+                const imgWidth = img.width;
+                const imgHeight = img.height;
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+                const width = imgWidth * ratio;
+                const height = imgHeight * ratio;
+                
+                pdf.addImage(imgData, 'JPEG', (pdfWidth - width) / 2, (pdfHeight - height) / 2, width, height);
+
+                const pdfBlob = pdf.getBlob();
+                const pdfFile = new File([pdfBlob], `${file.name.split('.').slice(0, -1).join('.')}.pdf`, { type: 'application/pdf' });
+
+                processedFiles.push(pdfFile);
+
             } catch (error) {
                  toast({
                     variant: "destructive",
-                    title: "Falha na compressão",
-                    description: `Não foi possível comprimir a imagem "${file.name}".`,
+                    title: "Falha na conversão para PDF",
+                    description: `Não foi possível processar a imagem "${file.name}".`,
                 });
             }
         } else if (file.type === 'application/pdf') {
@@ -272,7 +294,7 @@ export function SolicitarBeneficioForm() {
                       Selecionar Arquivos
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                      Imagens serão comprimidas. PDFs devem ser menores que 1MB.
+                      Imagens serão comprimidas e convertidas para PDF. PDFs devem ser menores que 1MB.
                   </p>
                 </div>
             </div>
