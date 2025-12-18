@@ -91,10 +91,13 @@ export default function MeusPedidosPage() {
         setIsUploading(true);
 
         try {
-            const documents: Document[] = [];
-            for (const file of exigenciaFiles) {
-                const downloadUrl = await uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`);
-                documents.push({ name: file.name, url: downloadUrl });
+            let documents: Document[] = [];
+            if (exigenciaFiles.length > 0) {
+                const uploadPromises = exigenciaFiles.map(async (file) => {
+                    const downloadUrl = await uploadFile(storage, file, `requests/${currentRequest.id}/${file.name}`);
+                    return { name: file.name, url: downloadUrl };
+                });
+                documents = await Promise.all(uploadPromises);
             }
 
             const response = {

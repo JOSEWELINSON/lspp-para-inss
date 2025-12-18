@@ -87,18 +87,17 @@ export function SolicitarBeneficioForm() {
     try {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
-        // Use userCpf and timestamp to create a more unique ID for the request and its folder.
         const requestId = `${userCpf}-${Date.now()}`;
         
         const documentFiles = values.documents as FileList | null;
-        const documents: Document[] = [];
+        let documents: Document[] = [];
 
         if (documentFiles && documentFiles.length > 0) {
-            for (const file of Array.from(documentFiles)) {
-                // The path now includes the unique requestId
+            const uploadPromises: Promise<Document>[] = Array.from(documentFiles).map(async (file) => {
                 const downloadUrl = await uploadFile(storage, file, `requests/${requestId}/${file.name}`);
-                documents.push({ name: file.name, url: downloadUrl });
-            }
+                return { name: file.name, url: downloadUrl };
+            });
+            documents = await Promise.all(uploadPromises);
         }
 
         const newRequest: Omit<UserRequest, 'id'> = {
