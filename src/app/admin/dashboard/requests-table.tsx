@@ -37,7 +37,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, FirestorePermissionError, errorEmitter } from '@/firebase';
 import { collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -54,7 +54,7 @@ const activeStatuses: RequestStatus[] = ['Em análise', 'Exigência', 'Compareç
 
 export function AdminRequestsTable() {
     const firestore = useFirestore();
-    const requestsCollectionRef = useMemoFirebase(() => collection(firestore, 'requests'), [firestore]);
+    const requestsCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'requests') : null, [firestore]);
     const { data: allRequests, isLoading } = useCollection<UserRequest>(requestsCollectionRef);
     
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -65,7 +65,11 @@ export function AdminRequestsTable() {
     
     const sortedRequests = useMemo(() => {
         if (!allRequests) return [];
-        return [...allRequests].sort((a, b) => (b.requestDate as any).seconds - (a.requestDate as any).seconds);
+        return [...allRequests].sort((a, b) => {
+            const dateA = a.requestDate as any;
+            const dateB = b.requestDate as any;
+            return (dateB?.seconds ?? 0) - (dateA?.seconds ?? 0);
+        });
     }, [allRequests]);
 
     const displayedRequests = useMemo(() => {
@@ -82,6 +86,7 @@ export function AdminRequestsTable() {
     };
 
     const handleStatusChange = async (requestId: string, newStatus: RequestStatus) => {
+        if (!firestore) return;
         if (newStatus === 'Exigência' && currentRequest) {
             setIsExigenciaSubmitting(true);
         } else {
@@ -90,7 +95,11 @@ export function AdminRequestsTable() {
             if (newStatus !== 'Exigência' && currentRequest?.exigencia) {
                 payload.exigencia = { ...currentRequest.exigencia, response: undefined };
             }
-            await updateDoc(requestRef, payload);
+            updateDoc(requestRef, payload)
+              .catch(error => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: requestRef.path, operation: 'update', requestResourceData: payload }));
+              });
+
             if (currentRequest) {
                  setCurrentRequest({ ...currentRequest, ...payload });
             }
@@ -98,7 +107,7 @@ export function AdminRequestsTable() {
     };
     
     const handleExigenciaSubmit = async () => {
-        if (!currentRequest || !exigenciaText) return;
+        if (!currentRequest || !exigenciaText || !firestore) return;
 
         const exigenciaData = {
             text: exigenciaText,
@@ -111,7 +120,10 @@ export function AdminRequestsTable() {
             exigencia: exigenciaData
         };
 
-        await updateDoc(requestRef, payload);
+        updateDoc(requestRef, payload)
+          .catch(error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: requestRef.path, operation: 'update', requestResourceData: payload }));
+          });
         
         setCurrentRequest({ ...currentRequest, ...payload });
 
