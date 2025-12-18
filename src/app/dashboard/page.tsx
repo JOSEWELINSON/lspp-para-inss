@@ -58,7 +58,8 @@ export default function DashboardPage() {
         const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
         if (foundUser) {
             setUser(foundUser);
-            const userRequests = appData.requests.filter((r: UserRequest) => r.user.cpf === currentUserCpf);
+            // Filter out 'Indeferido' requests from the main dashboard view
+            const userRequests = appData.requests.filter((r: UserRequest) => r.user.cpf === currentUserCpf && r.status !== 'Indeferido');
             setMyRequests(userRequests);
         } else {
             router.push('/');

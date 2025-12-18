@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -47,13 +47,16 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
 };
 
 const allStatuses: RequestStatus[] = ['Em análise', 'Exigência', 'Deferido', 'Indeferido', 'Compareça presencialmente'];
+const activeStatuses: RequestStatus[] = ['Em análise', 'Exigência', 'Compareça presencialmente'];
+
 
 export function AdminRequestsTable() {
-    const [requests, setRequests] = useState<UserRequest[]>([]);
+    const [allRequests, setAllRequests] = useState<UserRequest[]>([]);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [isExigenciaSubmitting, setIsExigenciaSubmitting] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaText, setExigenciaText] = useState("");
+    const [showAll, setShowAll] = useState(false);
 
 
     useEffect(() => {
@@ -61,12 +64,20 @@ export function AdminRequestsTable() {
             const appDataRaw = localStorage.getItem('appData');
             if (appDataRaw) {
                 const appData = JSON.parse(appDataRaw);
-                setRequests(appData.requests || []);
+                setAllRequests(appData.requests || []);
             }
         } catch (error) {
             console.error("Failed to load requests for admin", error);
         }
     }, []);
+
+    const displayedRequests = useMemo(() => {
+        if (showAll) {
+            return allRequests;
+        }
+        return allRequests.filter(req => activeStatuses.includes(req.status));
+    }, [allRequests, showAll]);
+
 
     const updateRequestsInStorage = (updatedRequests: UserRequest[]) => {
         try {
@@ -88,10 +99,10 @@ export function AdminRequestsTable() {
         if (newStatus === 'Exigência' && currentRequest) {
             setIsExigenciaSubmitting(true);
         } else {
-            const updatedRequests = requests.map(req => 
+            const updatedRequests = allRequests.map(req => 
                 req.id === requestId ? { ...req, status: newStatus } : req
             );
-            setRequests(updatedRequests);
+            setAllRequests(updatedRequests);
             updateRequestsInStorage(updatedRequests);
             const updatedCurrentRequest = updatedRequests.find(req => req.id === requestId) || null;
             setCurrentRequest(updatedCurrentRequest);
@@ -101,7 +112,7 @@ export function AdminRequestsTable() {
     const handleExigenciaSubmit = () => {
         if (!currentRequest || !exigenciaText) return;
 
-        const updatedRequests = requests.map(req => 
+        const updatedRequests = allRequests.map(req => 
             req.id === currentRequest.id 
             ? { 
                 ...req, 
@@ -114,7 +125,7 @@ export function AdminRequestsTable() {
             : req
         );
 
-        setRequests(updatedRequests);
+        setAllRequests(updatedRequests);
         updateRequestsInStorage(updatedRequests);
         
         const updatedCurrentRequest = updatedRequests.find(req => req.id === currentRequest.id) || null;
@@ -136,6 +147,11 @@ export function AdminRequestsTable() {
 
     return (
         <Fragment>
+            <div className="flex justify-end p-4">
+                <Button variant="outline" onClick={() => setShowAll(!showAll)}>
+                    {showAll ? 'Ver Apenas Ativos' : 'Ver Todos'}
+                </Button>
+            </div>
             <Table>
                 <TableHeader>
                 <TableRow>
@@ -147,7 +163,7 @@ export function AdminRequestsTable() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {requests.map((request) => (
+                {displayedRequests.length > 0 ? displayedRequests.map((request) => (
                     <TableRow key={request.id} onClick={() => openDetailsModal(request)} className="cursor-pointer">
                         <TableCell className="font-medium">{request.user.name}</TableCell>
                         <TableCell>{request.user.cpf}</TableCell>
@@ -157,7 +173,13 @@ export function AdminRequestsTable() {
                             <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
                         </TableCell>
                     </TableRow>
-                ))}
+                )) : (
+                     <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                            {showAll ? "Nenhuma solicitação encontrada." : "Nenhuma solicitação ativa no momento."}
+                        </TableCell>
+                    </TableRow>
+                )}
                 </TableBody>
             </Table>
             
