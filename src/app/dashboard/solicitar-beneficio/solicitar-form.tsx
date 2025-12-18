@@ -72,16 +72,17 @@ export function SolicitarBeneficioForm() {
     }
   }, [router]);
   
-  const fileRef = form.register("documents");
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       description: "",
     },
   });
+  
+  const fileRef = form.register("documents");
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+
+  async function onSubmit(values: z.infer<typeof formSchema>>) {
     if (!user) {
         toast({
             variant: 'destructive',
@@ -228,5 +229,3 @@ export function SolicitarBeneficioForm() {
     </Card>
   );
 }
-
-    
