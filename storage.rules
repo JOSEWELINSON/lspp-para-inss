@@ -1,12 +1,12 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permite que qualquer pessoa leia os arquivos, pois os links não são públicos.
-    // Apenas usuários com acesso ao Firestore poderão ver os links.
+    // ATENÇÃO: Regras abertas para fins de prototipagem.
+    // Permite leitura e escrita de arquivos para qualquer pessoa.
     match /{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null; // Apenas usuários autenticados podem escrever/enviar arquivos.
+      allow read, write: if true;
     }
   }
 }

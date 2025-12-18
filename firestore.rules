@@ -3,39 +3,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions for reusable logic
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    // User can manage their own profile
-    match /users/{userId} {
-      allow read, create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if false;
-    }
-
-    // Requests collection access rules
-    // Read is public for the prototype to ensure the admin panel can list all requests.
-    // Write is restricted to authenticated users.
-    match /requests/{requestId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-    
-    // Admins collection is publicly readable, but can only be written server-side.
-    match /admins/{adminId} {
-        allow read: if true;
-        allow write: if false; // Should only be written from a trusted backend
+    // ATENÇÃO: Regras abertas para fins de prototipagem.
+    // Permite leitura e escrita em toda a base de dados para qualquer pessoa.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
