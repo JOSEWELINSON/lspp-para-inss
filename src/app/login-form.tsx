@@ -7,8 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { signInAnonymously } from "firebase/auth";
-import { doc, setDoc, getDocs, collection, query, where, limit, updateDoc } from "firebase/firestore";
+import { signInAnonymously, type User } from "firebase/auth";
+import { doc, setDoc, getDocs, collection, query, where, limit, writeBatch, getDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +60,16 @@ export function UserLoginForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     
+    if (!auth || !firestore) {
+      toast({
+        variant: "destructive",
+        title: "Erro de Inicialização",
+        description: "Serviços do Firebase não estão disponíveis. Tente novamente mais tarde.",
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
         const usersRef = collection(firestore, "users");
         const q = query(usersRef, where("cpf", "==", values.cpf), limit(1));
@@ -74,7 +84,7 @@ export function UserLoginForm() {
             const userData = userDoc.data() as UserProfile;
 
             if (userData.fullName.toLowerCase() !== values.fullName.toLowerCase()) {
-                await auth.signOut(); // Sign out the anonymous user
+                await authUser.delete(); // Clean up the created anonymous user
                 toast({
                     variant: "destructive",
                     title: "Acesso Negado",
@@ -84,10 +94,36 @@ export function UserLoginForm() {
                 return;
             }
             
-            // If name matches, update the existing document with the new anonymous UID.
-            // This ensures the current session is linked to the correct profile.
-            const userRef = doc(firestore, "users", userDoc.id);
-            await updateDoc(userRef, { id: authUser.uid });
+            // If name matches, we need to associate the new anonymous auth user with the existing profile.
+            // A robust way would be a custom token, but for this prototype, we'll
+            // update the 'id' field in the existing document to the new authUser's UID.
+            // This is not ideal because it changes the document ID if we stored it by UID, 
+            // but our current logic finds the doc by CPF, so it's a workable solution.
+            
+            // To be more robust, we will create a new doc with the new UID and delete the old one.
+            const batch = writeBatch(firestore);
+            
+            const oldDocRef = doc(firestore, 'users', userDoc.id);
+            const newDocRef = doc(firestore, 'users', authUser.uid);
+            
+            // Check if the new doc ID already exists to avoid overwriting
+            const newDocSnap = await getDoc(newDocRef);
+            if (newDocSnap.exists()) {
+                // This case is unlikely with anonymous auth but good to handle.
+                // It means a user with this new UID already has a profile.
+                // We'll just proceed with login.
+            } else {
+                 const newProfileData: UserProfile = {
+                    ...userData, // copy existing data
+                    id: authUser.uid, // update the ID to the new auth UID
+                };
+                batch.set(newDocRef, newProfileData);
+                if (userDoc.id !== authUser.uid) { // Avoid deleting if IDs are the same
+                   batch.delete(oldDocRef);
+                }
+                await batch.commit();
+            }
+            
 
             toast({
                 title: "Bem-vindo de volta!",
@@ -95,15 +131,15 @@ export function UserLoginForm() {
             });
 
         } else {
-            // New user, create profile with the new anonymous UID
+            // New user, create a profile using the new anonymous user's UID as the document ID
             const newUserProfile: UserProfile = {
-                id: authUser.uid, // Use the new anonymous UID
+                id: authUser.uid,
                 cpf: values.cpf,
                 fullName: values.fullName,
             };
-            // Create a document with the UID as the ID
             const userRef = doc(firestore, "users", authUser.uid);
             await setDoc(userRef, newUserProfile);
+            
             toast({
                 title: "Cadastro realizado com sucesso!",
                 description: "Redirecionando para o seu painel.",
@@ -115,7 +151,8 @@ export function UserLoginForm() {
     } catch (error: any) {
        console.error("Login/Signup Error: ", error);
        if (auth.currentUser) {
-           await auth.signOut();
+           // We can try to sign out but if the user was just deleted it might fail
+           try { await auth.signOut(); } catch(e) {}
        }
        toast({
         variant: "destructive",
