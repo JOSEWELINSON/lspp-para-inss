@@ -25,7 +25,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
 import { useAuth, useFirestore } from "@/firebase";
 import { type UserProfile } from "@/lib/data";
-import { InstallPWAButton } from "@/components/install-pwa-button";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nome completo é obrigatório." }),
@@ -199,7 +198,6 @@ export function UserLoginForm() {
                 Acesso para profissionais do INSS
             </Link>
         </div>
-        <InstallPWAButton />
       </CardFooter>
     </Card>
   );
