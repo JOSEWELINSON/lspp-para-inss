@@ -1,11 +1,10 @@
-'use client';
+"use client";
 import { useEffect, useState, Fragment, ChangeEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, X } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import imageCompression from 'browser-image-compression';
-import jsPDF from 'jspdf';
 
 import {
   Table,
@@ -96,71 +95,46 @@ export default function MeusPedidosPage() {
         setIsUploading(true);
 
         const selectedFiles = Array.from(e.target.files);
-        const imageFiles = selectedFiles.filter(file => file.type.startsWith('image/'));
-        const otherFiles = selectedFiles.filter(file => !file.type.startsWith('image/'));
         const processedFiles: File[] = [];
 
-        // Process other files (PDFs, etc.)
-        for (const file of otherFiles) {
-            if (file.size > 1024 * 1024) { // 1MB limit for non-images
-                toast({
-                    variant: "destructive",
-                    title: "Arquivo Muito Grande",
-                    description: `O arquivo "${file.name}" excede o limite de 1MB e não pode ser enviado.`,
-                });
-            } else {
-                processedFiles.push(file);
-            }
-        }
-
-        // Process image files into a single PDF
-        if (imageFiles.length > 0) {
-            try {
-                const pdf = new jsPDF();
-                
-                for (let i = 0; i < imageFiles.length; i++) {
-                    const file = imageFiles[i];
+        for (const file of selectedFiles) {
+            if (file.type.startsWith('image/')) {
+                try {
                     const options = {
                         maxSizeMB: 1,
                         maxWidthOrHeight: 1920,
                         useWebWorker: true,
                     };
                     const compressedFile = await imageCompression(file, options);
-                    const imgData = await fileToDataUrl(compressedFile);
-                    const img = new Image();
-                    img.src = imgData;
-                    await new Promise(resolve => { img.onload = resolve; });
-
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = (img.height * pdfWidth) / img.width;
-
-                    if (i > 0) {
-                        pdf.addPage();
-                    }
-                    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                    processedFiles.push(compressedFile);
+                } catch (error) {
+                    toast({
+                        variant: "destructive",
+                        title: "Falha na compressão",
+                        description: `Não foi possível comprimir a imagem "${file.name}".`,
+                    });
                 }
-                
-                const pdfBlob = pdf.getBlob();
-                const pdfFile = new File([pdfBlob], 'imagens-comprovantes.pdf', { type: 'application/pdf' });
-                
-                processedFiles.push(pdfFile);
-                toast({
-                    title: "Imagens Convertidas",
-                    description: `${imageFiles.length} imagem(ns) foram comprimidas e agrupadas em um único PDF.`,
-                });
-
-            } catch (error) {
+            } else if (file.type === 'application/pdf') {
+                 if (file.size > 1024 * 1024) {
+                    toast({
+                        variant: "destructive",
+                        title: "Arquivo PDF Muito Grande",
+                        description: `O arquivo "${file.name}" excede 1MB e não pode ser enviado.`,
+                    });
+                } else {
+                    processedFiles.push(file);
+                }
+            } else {
                 toast({
                     variant: "destructive",
-                    title: "Falha na Conversão de Imagem",
-                    description: "Não foi possível processar as imagens para PDF.",
+                    title: "Tipo de Arquivo Inválido",
+                    description: `O arquivo "${file.name}" não é suportado. Envie apenas imagens ou PDFs.`,
                 });
             }
         }
         
         setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
         setIsUploading(false);
-        // Reset file input to allow selecting the same file again
         if(e.target) e.target.value = '';
     };
     
@@ -186,15 +160,6 @@ export default function MeusPedidosPage() {
         try {
             const uploadedDocuments: Documento[] = [];
             for (const file of filesToUpload) {
-                if (file.size > 1024 * 1024 * 1.5) { // 1.5MB to be safe
-                    toast({
-                        variant: "destructive",
-                        title: "Arquivo Muito Grande",
-                        description: `O arquivo "${file.name}" excede o limite de 1MB. Remova-o para continuar.`,
-                    });
-                    setIsUploading(false);
-                    return;
-                }
                 const dataUrl = await fileToDataUrl(file);
                 uploadedDocuments.push({ name: file.name, type: file.type, dataUrl });
             }
@@ -529,7 +494,7 @@ export default function MeusPedidosPage() {
                                          accept="image/*,application/pdf"
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Imagens serão convertidas para PDF. Outros arquivos devem ser menores que 1MB.
+                                         Imagens serão comprimidas. PDFs devem ser menores que 1MB.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (

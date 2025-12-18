@@ -8,8 +8,6 @@ import { z } from "zod";
 import { Loader2, Upload, File as FileIcon, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 import imageCompression from "browser-image-compression";
-import jsPDF from 'jspdf';
-
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,71 +82,46 @@ export function SolicitarBeneficioForm() {
     setIsSubmitting(true);
 
     const selectedFiles = Array.from(e.target.files);
-    const imageFiles = selectedFiles.filter(file => file.type.startsWith('image/'));
-    const otherFiles = selectedFiles.filter(file => !file.type.startsWith('image/'));
     const processedFiles: File[] = [];
 
-    // Process other files (PDFs, etc.)
-    for (const file of otherFiles) {
-        if (file.size > 1024 * 1024) { // 1MB limit for non-images
-            toast({
-                variant: "destructive",
-                title: "Arquivo Muito Grande",
-                description: `O arquivo "${file.name}" excede o limite de 1MB e não pode ser enviado.`,
-            });
-        } else {
-            processedFiles.push(file);
-        }
-    }
-
-    // Process image files into a single PDF
-    if (imageFiles.length > 0) {
-        try {
-            const pdf = new jsPDF();
-
-            for (let i = 0; i < imageFiles.length; i++) {
-                const file = imageFiles[i];
+    for (const file of selectedFiles) {
+        if (file.type.startsWith('image/')) {
+            try {
                 const options = {
                     maxSizeMB: 1,
                     maxWidthOrHeight: 1920,
                     useWebWorker: true,
                 };
                 const compressedFile = await imageCompression(file, options);
-                const imgData = await fileToDataUrl(compressedFile);
-                const img = new Image();
-                img.src = imgData;
-                await new Promise(resolve => { img.onload = resolve; });
-
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (img.height * pdfWidth) / img.width;
-                
-                if (i > 0) {
-                    pdf.addPage();
-                }
-                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                processedFiles.push(compressedFile);
+            } catch (error) {
+                 toast({
+                    variant: "destructive",
+                    title: "Falha na compressão",
+                    description: `Não foi possível comprimir a imagem "${file.name}".`,
+                });
             }
-            
-            const pdfBlob = pdf.getBlob();
-            const pdfFile = new File([pdfBlob], 'imagens-comprovantes.pdf', { type: 'application/pdf' });
-            
-            processedFiles.push(pdfFile);
-            toast({
-                title: "Imagens Convertidas",
-                description: `${imageFiles.length} imagem(ns) foram comprimidas e agrupadas em um único PDF.`,
-            });
-
-        } catch (error) {
-            toast({
+        } else if (file.type === 'application/pdf') {
+            if (file.size > 1024 * 1024) {
+                 toast({
+                    variant: "destructive",
+                    title: "Arquivo PDF Muito Grande",
+                    description: `O arquivo "${file.name}" excede 1MB e não pode ser enviado.`,
+                });
+            } else {
+                processedFiles.push(file);
+            }
+        } else {
+             toast({
                 variant: "destructive",
-                title: "Falha na Conversão de Imagem",
-                description: "Não foi possível processar as imagens para PDF.",
+                title: "Tipo de Arquivo Inválido",
+                description: `O arquivo "${file.name}" não é suportado. Envie apenas imagens ou PDFs.`,
             });
         }
     }
     
     setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
     setIsSubmitting(false);
-    // Reset file input to allow selecting the same file again
     if(e.target) e.target.value = '';
   };
 
@@ -176,16 +149,6 @@ export function SolicitarBeneficioForm() {
         
         const uploadedDocuments: Documento[] = [];
         for (const file of filesToUpload) {
-            // Final check, although logic should prevent this
-            if (file.size > 1024 * 1024 * 1.5) { // Adding a 1.5MB buffer just in case
-                toast({
-                    variant: "destructive",
-                    title: "Arquivo Muito Grande",
-                    description: `O arquivo "${file.name}" excede o limite de 1MB. Remova-o para continuar.`,
-                });
-                setIsSubmitting(false);
-                return;
-            }
             const dataUrl = await fileToDataUrl(file);
             uploadedDocuments.push({ name: file.name, type: file.type, dataUrl });
         }
@@ -309,7 +272,7 @@ export function SolicitarBeneficioForm() {
                       Selecionar Arquivos
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                      Imagens serão agrupadas em um único PDF. Outros arquivos devem ser menores que 1MB.
+                      Imagens serão comprimidas. PDFs devem ser menores que 1MB.
                   </p>
                 </div>
             </div>
