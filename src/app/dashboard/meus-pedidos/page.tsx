@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, X } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import imageCompression from 'browser-image-compression';
 
 import {
   Table,
@@ -89,11 +90,48 @@ export default function MeusPedidosPage() {
         setIsExigenciaModalOpen(true);
     };
     
-    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-          const selectedFiles = Array.from(e.target.files);
-          setFilesToUpload(prevFiles => [...prevFiles, ...selectedFiles]);
+    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return;
+
+        const selectedFiles = Array.from(e.target.files);
+        const processedFiles: File[] = [];
+
+        for (const file of selectedFiles) {
+            const isImage = file.type.startsWith('image/');
+            const isTooLarge = file.size > 1024 * 1024; // 1MB
+
+            if (isImage && isTooLarge) {
+                try {
+                    const options = {
+                        maxSizeMB: 1,
+                        maxWidthOrHeight: 1920,
+                        useWebWorker: true,
+                    };
+                    const compressedFile = await imageCompression(file, options);
+                    processedFiles.push(compressedFile);
+                    toast({
+                        title: "Imagem Comprimida",
+                        description: `A imagem "${file.name}" foi otimizada para o envio.`,
+                    });
+                } catch (error) {
+                    toast({
+                        variant: "destructive",
+                        title: "Falha na Compressão",
+                        description: `Não foi possível comprimir a imagem "${file.name}". Tente uma imagem menor.`,
+                    });
+                }
+            } else if (isTooLarge) {
+                toast({
+                    variant: "destructive",
+                    title: "Arquivo Muito Grande",
+                    description: `O arquivo "${file.name}" excede o limite de 1MB e não pode ser comprimido.`,
+                });
+            } else {
+                processedFiles.push(file);
+            }
         }
+        
+        setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
     };
     
     const removeFile = (index: number) => {
@@ -122,7 +160,7 @@ export default function MeusPedidosPage() {
                     toast({
                         variant: "destructive",
                         title: "Arquivo Muito Grande",
-                        description: `O arquivo "${file.name}" excede o limite de 1MB.`,
+                        description: `O arquivo "${file.name}" excede o limite de 1MB. Remova-o para continuar.`,
                     });
                     setIsUploading(false);
                     return;
@@ -460,7 +498,7 @@ export default function MeusPedidosPage() {
                                          ref={fileInputRef}
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Máx: 1MB por arquivo.
+                                         Imagens maiores que 1MB serão comprimidas. Outros arquivos devem ser menores que 1MB.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (

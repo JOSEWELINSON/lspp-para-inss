@@ -8,6 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Upload, File as FileIcon, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
+import imageCompression from "browser-image-compression";
+
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,11 +79,48 @@ export function SolicitarBeneficioForm() {
     },
   });
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      setFilesToUpload(prevFiles => [...prevFiles, ...selectedFiles]);
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+
+    const selectedFiles = Array.from(e.target.files);
+    const processedFiles: File[] = [];
+
+    for (const file of selectedFiles) {
+        const isImage = file.type.startsWith('image/');
+        const isTooLarge = file.size > 1024 * 1024; // 1MB
+
+        if (isImage && isTooLarge) {
+            try {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                };
+                const compressedFile = await imageCompression(file, options);
+                processedFiles.push(compressedFile);
+                toast({
+                    title: "Imagem Comprimida",
+                    description: `A imagem "${file.name}" foi otimizada para o envio.`,
+                });
+            } catch (error) {
+                toast({
+                    variant: "destructive",
+                    title: "Falha na Compressão",
+                    description: `Não foi possível comprimir a imagem "${file.name}". Tente uma imagem menor.`,
+                });
+            }
+        } else if (isTooLarge) {
+            toast({
+                variant: "destructive",
+                title: "Arquivo Muito Grande",
+                description: `O arquivo "${file.name}" excede o limite de 1MB e não pode ser comprimido.`,
+            });
+        } else {
+            processedFiles.push(file);
+        }
     }
+    
+    setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
   };
 
   const removeFile = (index: number) => {
@@ -107,11 +146,12 @@ export function SolicitarBeneficioForm() {
         
         const uploadedDocuments: Documento[] = [];
         for (const file of filesToUpload) {
-            if (file.size > 1024 * 1024) { // 1MB limit
+            // Final check, although compression should handle it for images
+            if (file.size > 1024 * 1024) { 
                 toast({
                     variant: "destructive",
                     title: "Arquivo Muito Grande",
-                    description: `O arquivo "${file.name}" excede o limite de 1MB.`,
+                    description: `O arquivo "${file.name}" excede o limite de 1MB. Remova-o para continuar.`,
                 });
                 setIsSubmitting(false);
                 return;
@@ -238,7 +278,7 @@ export function SolicitarBeneficioForm() {
                       Selecionar Arquivos
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                      Você pode anexar laudos, comprovantes, etc. (Máx. 1MB por arquivo).
+                      Imagens maiores que 1MB serão comprimidas. Outros arquivos devem ser menores que 1MB.
                   </p>
                 </div>
             </div>
