@@ -1,11 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   FileText,
   HeartHandshake,
   Paperclip,
+  Loader2
 } from 'lucide-react';
 import {
   Card,
@@ -24,7 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { RequestStatus, UserRequest } from '@/lib/data';
+import type { RequestStatus, UserRequest, UserProfile } from '@/lib/data';
+import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { collection, doc, query, where } from 'firebase/firestore';
+import { useMemo } from 'react';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -34,47 +36,43 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
-type User = {
-  fullName: string;
-  cpf: string;
-}
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [myRequests, setMyRequests] = useState<UserRequest[]>([]);
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
 
-  useEffect(() => {
-    try {
-        const currentUserCpf = localStorage.getItem('currentUserCpf');
-        if (!currentUserCpf) {
-            router.push('/');
-            return;
-        }
+  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+  
+  const requestsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'requests'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: allRequests, isLoading: areRequestsLoading } = useCollection<UserRequest>(requestsQuery);
 
-        const appDataRaw = localStorage.getItem('appData');
-        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
-
-        const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
-        if (foundUser) {
-            setUser(foundUser);
-            // Filter out 'Indeferido' requests from the main dashboard view
-            const userRequests = appData.requests.filter((r: UserRequest) => r.user.cpf === currentUserCpf && r.status !== 'Indeferido');
-            setMyRequests(userRequests);
-        } else {
-            router.push('/');
-        }
-    } catch(error) {
-        console.error("Failed to load dashboard data", error);
-        router.push('/');
-    }
-  }, [router]);
+  const myRequests = useMemo(() => {
+    if (!allRequests) return [];
+    return allRequests.filter(r => r.status !== 'Indeferido');
+  }, [allRequests]);
 
   const recentRequests = myRequests.slice(0, 3);
-  const name = user ? user.fullName.split(' ')[0] : '';
+  const name = userProfile ? userProfile.fullName.split(' ')[0] : '';
   
-  if (!user) {
-      return null;
+  const isLoading = isUserLoading || isProfileLoading || areRequestsLoading;
+
+  if (isLoading) {
+      return (
+        <div className="flex flex-col gap-6">
+            <div className="space-y-1">
+                <h1 className="text-2xl font-bold tracking-tight lg:text-3xl font-headline">
+                    Carregando...
+                </h1>
+                <p className="text-muted-foreground">
+                    Buscando suas informações.
+                </p>
+            </div>
+            <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+      </div>
+      );
   }
 
   return (
@@ -156,7 +154,7 @@ export default function DashboardPage() {
                             <TableRow key={request.id}>
                                 <TableCell className="font-medium">{request.benefitTitle}</TableCell>
                                 <TableCell>{request.protocol}</TableCell>
-                                <TableCell>{new Date(request.requestDate).toLocaleDateString('pt-BR')}</TableCell>
+                                <TableCell>{request.requestDate ? new Date((request.requestDate as any).seconds * 1000).toLocaleDateString('pt-BR') : '-'}</TableCell>
                                 <TableCell>
                                     <Badge variant={statusVariant[request.status] || 'secondary'}>{request.status}</Badge>
                                 </TableCell>

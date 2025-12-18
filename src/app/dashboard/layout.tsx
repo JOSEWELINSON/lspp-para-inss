@@ -12,6 +12,7 @@ import {
   BotMessageSquare,
   HeartHandshake,
   Menu,
+  Loader2,
 } from 'lucide-react';
 
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -26,6 +27,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Logo } from '@/components/logo';
+import { useAuth, useUser, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { type UserProfile } from '@/lib/data';
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
@@ -36,51 +41,29 @@ const navItems = [
   { href: '/dashboard/perfil', label: 'Meu Perfil', icon: User },
 ];
 
-type User = {
-    fullName: string;
-    cpf: string;
-}
-
 function UserMenu() {
     const router = useRouter();
-    const [user, setUser] = useState<User | null>(null);
+    const auth = useAuth();
+    const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
 
-    useEffect(() => {
-        try {
-            const currentUserCpf = localStorage.getItem('currentUserCpf');
-            if (!currentUserCpf) {
-                router.push('/');
-                return;
-            }
-            const appDataRaw = localStorage.getItem('appData');
-            const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [] };
-            const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
-            
-            if (foundUser) {
-                setUser(foundUser);
-            } else {
-                router.push('/');
-            }
-        } catch (error) {
-            console.error("Failed to load user session", error);
-            router.push('/');
-        }
-    }, [router]);
+    const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
-    const handleLogout = () => {
-        try {
-            localStorage.removeItem('currentUserCpf');
-        } catch (error) {
-            console.error("Failed to remove current user session", error);
-        }
+    const handleLogout = async () => {
+        await auth.signOut();
         router.push('/');
     };
 
-    if (!user) {
+    if (isUserLoading || isProfileLoading) {
+        return <Loader2 className="animate-spin h-6 w-6" />;
+    }
+
+    if (!user || !userProfile) {
         return null;
     }
 
-    const nameInitial = user.fullName ? user.fullName.charAt(0).toUpperCase() : '?';
+    const nameInitial = userProfile.fullName ? userProfile.fullName.charAt(0).toUpperCase() : '?';
 
     return (
         <DropdownMenu>
@@ -93,7 +76,7 @@ function UserMenu() {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{user.fullName}</DropdownMenuLabel>
+                <DropdownMenuLabel>{userProfile.fullName}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                     <Link href="/dashboard/perfil">Perfil</Link>
@@ -132,15 +115,21 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const { user, isUserLoading } = useUser();
+  
   useEffect(() => {
-    try {
-        if (!localStorage.getItem('currentUserCpf')) {
-            router.push('/');
-        }
-    } catch (error) {
+    if (!isUserLoading && !user) {
         router.push('/');
     }
-  }, [router]);
+  }, [user, isUserLoading, router]);
+
+  if(isUserLoading || !user) {
+    return (
+        <div className="flex min-h-screen w-full items-center justify-center bg-background">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    )
+  }
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">

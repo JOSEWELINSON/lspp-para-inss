@@ -1,12 +1,13 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Upload } from "lucide-react";
+import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { benefits, type UserRequest, type Document } from "@/lib/data";
+import { benefits, type UserRequest, type Document, type UserProfile } from "@/lib/data";
+import { useDoc, useFirestore, useUser, useMemoFirebase } from "@/firebase";
+import { uploadFile } from "@/firebase/storage";
+
 
 const formSchema = z.object({
   benefitId: z.string({ required_error: "Por favor, selecione um benefício." }),
@@ -39,26 +43,16 @@ const formSchema = z.object({
   documents: z.any().optional(),
 });
 
-type User = {
-    fullName: string;
-    cpf: string;
-}
-
-const fileToDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-};
-
 
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: userProfile } = useDoc<UserProfile>(userDocRef);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -68,32 +62,9 @@ export function SolicitarBeneficioForm() {
   });
   
   const fileRef = form.register("documents");
-
-  useEffect(() => {
-    try {
-        const currentUserCpf = localStorage.getItem('currentUserCpf');
-        if (!currentUserCpf) {
-            router.push('/');
-            return;
-        }
-
-        const appDataRaw = localStorage.getItem('appData');
-        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [] };
-        const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
-
-        if(foundUser) {
-            setUser(foundUser);
-        } else {
-            router.push('/');
-        }
-    } catch(e) {
-        console.error("Failed to get user for request form", e);
-        router.push('/');
-    }
-  }, [router]);
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user) {
+    if (!user || !userProfile) {
         toast({
             variant: 'destructive',
             title: "Erro de Autenticação",
@@ -107,6 +78,7 @@ export function SolicitarBeneficioForm() {
     
     const protocol = `2024${Date.now().toString().slice(-6)}`;
     const selectedBenefit = benefits.find(b => b.id === values.benefitId);
+    const requestId = new Date().toISOString();
     
     const documentFiles = values.documents as FileList | null;
     const documents: Document[] = [];
@@ -114,66 +86,55 @@ export function SolicitarBeneficioForm() {
     if (documentFiles) {
         for (const file of Array.from(documentFiles)) {
              try {
-                const url = await fileToDataURL(file);
-                documents.push({ name: file.name, url: url });
+                const downloadUrl = await uploadFile(file, `requests/${requestId}/${file.name}`);
+                documents.push({ name: file.name, url: downloadUrl });
             } catch (error) {
-                console.error("Error converting file to Data URL", error);
+                console.error("Error uploading file to Storage", error);
                 toast({
                     variant: "destructive",
-                    title: "Erro ao Processar Arquivo",
-                    description: `Não foi possível processar o arquivo ${file.name}.`,
+                    title: "Erro ao Enviar Arquivo",
+                    description: `Não foi possível enviar o arquivo ${file.name}.`,
                 });
+                setIsLoading(false);
+                return;
             }
         }
     }
 
-    const newRequest: UserRequest = {
-        id: new Date().toISOString(),
+    const newRequest: Omit<UserRequest, 'id'> = {
         protocol,
+        benefitId: values.benefitId,
         benefitTitle: selectedBenefit?.title || 'Benefício Desconhecido',
-        requestDate: new Date().toISOString(),
+        requestDate: serverTimestamp(),
         status: 'Em análise',
         description: values.description,
         documents: documents,
+        userId: user.uid,
         user: {
-            name: user.fullName,
-            cpf: user.cpf,
+            name: userProfile.fullName,
+            cpf: userProfile.cpf,
         }
     };
     
     try {
-        const appDataRaw = localStorage.getItem('appData');
-        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
-        
-        // Remove 'url' before saving to localStorage to avoid QuotaExceededError
-        const requestToStore = { ...newRequest, documents: newRequest.documents.map(({name}) => ({name, url: ''})) };
-        appData.requests.unshift(requestToStore);
-
-        localStorage.setItem('appData', JSON.stringify(appData));
-
-        // For this session, keep the full request with data urls in a separate session storage
-        // So the admin can view it if they are on the "same machine" for this prototype
-        sessionStorage.setItem(newRequest.id, JSON.stringify(newRequest));
-
+        const requestsCollection = collection(firestore, 'requests');
+        await addDoc(requestsCollection, newRequest);
 
         toast({
           title: "Solicitação Enviada com Sucesso!",
           description: `Seu pedido foi registrado e está em análise. Protocolo: ${protocol}`,
         });
 
-        setIsLoading(false);
         router.push("/dashboard/meus-pedidos");
 
     } catch (error: any) {
-        console.error("Failed to save request", error);
-        
-        const isQuotaError = error.name === 'QuotaExceededError';
-
+        console.error("Failed to save request to Firestore", error);
         toast({
           variant: "destructive",
-          title: isQuotaError ? "Erro de Armazenamento" : "Erro ao Salvar Solicitação",
-          description: isQuotaError ? "O armazenamento local está cheio. Tente limpar o cache do navegador ou remover solicitações antigas." : "Não foi possível registrar seu pedido. Tente novamente.",
+          title: "Erro ao Salvar Solicitação",
+          description: "Não foi possível registrar seu pedido. Tente novamente.",
         });
+    } finally {
         setIsLoading(false);
     }
   }
@@ -255,8 +216,8 @@ export function SolicitarBeneficioForm() {
             />
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={isLoading || isUserLoading}>
+              {(isLoading || isUserLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enviar Solicitação
             </Button>
           </CardFooter>
@@ -265,5 +226,3 @@ export function SolicitarBeneficioForm() {
     </Card>
   );
 }
-
-    

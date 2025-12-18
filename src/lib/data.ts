@@ -1,3 +1,5 @@
+import { type Timestamp } from "firebase/firestore";
+
 export type Benefit = {
   id: string;
   title: string;
@@ -41,28 +43,40 @@ export type RequestStatus = 'Em análise' | 'Exigência' | 'Deferido' | 'Indefer
 
 export type Document = {
   name: string;
-  url: string; // Base64 Data URL
+  url: string; 
+}
+
+export type UserProfile = {
+    id: string;
+    cpf: string;
+    fullName: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    birthDate?: string;
 }
 
 export type UserRequest = {
   id: string;
   protocol: string;
+  benefitId: string;
   benefitTitle: string;
-  requestDate: string;
+  requestDate: Timestamp | string;
   status: RequestStatus;
   description: string;
   documents: Document[];
+  userId: string;
   user: {
     name: string;
     cpf: string;
   };
   exigencia?: {
     text: string;
-    createdAt: string;
+    createdAt: Timestamp | string;
     response?: {
       text: string;
       files: Document[];
-      respondedAt: string;
+      respondedAt: Timestamp | string;
     }
   }
 };

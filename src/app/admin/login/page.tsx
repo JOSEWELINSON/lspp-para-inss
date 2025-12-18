@@ -7,6 +7,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { ArrowRight, Loader2, UserCog } from "lucide-react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,42 +24,82 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
+import { useAuth, useFirestore } from "@/firebase";
 
 const formSchema = z.object({
-  username: z.string().min(1, { message: "Usuário é obrigatório." }),
-  password: z.string().min(1, { message: "Senha é obrigatória." }),
+  email: z.string().email({ message: "Email inválido." }),
+  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
 });
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const auth = useAuth();
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      email: "welinson@inss.gov.br",
       password: "",
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Hardcoded credentials check for prototype
+    if (values.email !== "welinson@inss.gov.br" || values.password !== "INSS17WE") {
+        toast({
+            variant: "destructive",
+            title: "Credenciais Inválidas",
+            description: "Usuário ou senha incorretos para o acesso de administrador.",
+        });
+        setIsLoading(false);
+        return;
+    }
+    
+    try {
+        // We sign in anonymously for the prototype to get a UID, then check for admin role.
+        // In a real app, you would use Email/Password provider.
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password).catch(async (error) => {
+          // If user does not exist, we can't check for admin role.
+          // For this prototype, we'll just show an invalid credentials error.
+          // In a real app, you might handle this differently (e.g. user not found).
+          if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+               throw new Error("Credenciais Inválidas");
+          }
+          throw error;
+      });
 
-    if (values.username === "WelinsonINSS17" && values.password === "INSS17WE") {
-      toast({
-        title: "Login de administrador bem-sucedido!",
-        description: "Redirecionando para o painel de controle.",
-      });
-      router.push("/admin/dashboard");
-    } else {
-      toast({
+      const user = userCredential.user;
+
+      const adminDocRef = doc(firestore, 'admins', user.uid);
+      const adminDoc = await getDoc(adminDocRef);
+
+      if (adminDoc.exists() && adminDoc.data().isAdmin) {
+         toast({
+            title: "Login de administrador bem-sucedido!",
+            description: "Redirecionando para o painel de controle.",
+        });
+        router.push("/admin/dashboard");
+      } else {
+        await auth.signOut();
+        toast({
+            variant: "destructive",
+            title: "Acesso Negado",
+            description: "Você não tem permissão de administrador.",
+        });
+      }
+    } catch (error: any) {
+       toast({
         variant: "destructive",
-        title: "Credenciais Inválidas",
-        description: "Usuário ou senha incorretos.",
+        title: "Erro de Autenticação",
+        description: error.message || "Ocorreu um erro. Tente novamente.",
       });
-      setIsLoading(false);
+    } finally {
+        setIsLoading(false);
     }
   }
 
@@ -79,12 +122,12 @@ export default function AdminLoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="username"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Usuário</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Seu usuário" {...field} />
+                      <Input placeholder="seu@email.gov.br" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

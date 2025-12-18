@@ -1,44 +1,6 @@
-/**
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for all personal and sensitive
- * data, such as user profiles, benefit applications, and uploaded documents. A clear
- * distinction is made between private user data and public information. It also
- * implements a role-based access control (RBAC) system for "INSS Professionals"
- * who are granted read-only access to user application data for review purposes.
- *
- * Data Structure:
- * All user-specific data is nested under the `/user_profiles/{userId}` path,
- * creating a secure data boundary for each user. Publicly accessible information,
- * such as the list of available benefits, is stored in a top-level `/beneficios`
- * collection. Administrative roles are managed in a separate `/roles_inss_profissionais`
- * collection, which is used as a lookup table for authorization.
- *
- * Key Security Decisions:
- * - User data is private: A user can only access and modify their own documents within
- *   their `/user_profiles/{userId}` data tree.
- * - Listing users is prohibited: To protect user privacy, it is not possible to list
- *   all documents in the `/user_profiles` collection.
- * - Public data is read-only: Information about benefits (`/beneficios`) is readable
- *   by anyone but cannot be modified by clients, ensuring data integrity.
- * - Role-based read access: Users identified as INSS Professionals are granted
- *   read-only access to all user benefit applications (`solicitacoes_beneficios`) and
- *   documents (`documentos`) but cannot modify this data.
- * - Default deny: Any operation not explicitly allowed is denied.
- *
- * Denormalization for Authorization:
- * To ensure fast and secure authorization checks, the `userId` is denormalized
- * (copied) onto every `SolicitacaoBeneficio` and `Documentos` document. This allows
- * security rules to verify ownership directly from the document itself, avoiding slow
- * and costly `get()` calls to parent documents. This is critical for securing list
- * operations on subcollections.
- *
- * Structural Segregation:
- * The separation of private user data (`/user_profiles/{userId}`) from public data
- * (`/beneficios`) is a deliberate design choice. This structure simplifies security
- * rules and allows for safe public listing of benefits without exposing any private
- * user information.
- */
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -50,125 +12,38 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
-    // Checks for ownership on an existing document. Used for update/delete.
+    
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
     // Checks if the authenticated user is an INSS professional by looking for
-    // their UID in the roles collection.
-    function isINSSProfessional() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_inss_profissionais/$(request.auth.uid));
+    // their UID in the admins collection.
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    /**
-     * @description
-     *   Manages user profile documents. A user can create their own profile, and
-     *   once created, only they can read or update it. Profiles cannot be deleted.
-     * @path
-     *   /user_profiles/{userId}
-     * @allow
-     *   A newly signed-up user with uid 'user_abc' (create)s their own profile at `/user_profiles/user_abc`.
-     * @deny
-     *   User 'user_xyz' (get)s a document at `/user_profiles/user_abc`.
-     * @principle
-     *   Restricts access to a user's own data tree and enforces self-creation.
-     */
-    match /user_profiles/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false; // Prevent user enumeration
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if false; // Profiles are not deletable by users
-    }
-
-    /**
-     * @description
-     *   Stores information about available INSS benefits. This data is public for all
-     *   users to read but cannot be modified by any client to ensure data integrity.
-     * @path
-     *   /beneficios/{beneficioId}
-     * @allow
-     *   An unauthenticated visitor (list)s all documents in the `/beneficios` collection.
-     * @deny
-     *   An authenticated user (create)s a new document in `/beneficios`.
-     * @principle
-     *   Provides public read access while preventing all client-side writes.
-     */
-    match /beneficios/{beneficioId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
+    // User can manage their own profile
+    match /users/{userId} {
+      allow read, create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if false;
     }
 
-    /**
-     * @description
-     *   Manages benefit applications for a specific user. The user can create, read,
-     *   update, and delete their own applications. INSS professionals have read-only
-     *   access to all applications for review purposes.
-     * @path
-     *   /user_profiles/{userId}/solicitacoes_beneficios/{solicitacaoId}
-     * @allow
-     *   User 'user_abc' (create)s a new application at `/user_profiles/user_abc/solicitacoes_beneficios/app_123`.
-     * @deny
-     *   User 'user_xyz' (update)s an application at `/user_profiles/user_abc/solicitacoes_beneficios/app_123`.
-     * @principle
-     *   Enforces document ownership for writes and provides role-based read access.
-     */
-    match /user_profiles/{userId}/solicitacoes_beneficios/{solicitacaoId} {
-      allow get: if isOwner(userId) || isINSSProfessional();
-      allow list: if isOwner(userId) || isINSSProfessional();
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+    // Requests can be created by any authenticated user.
+    // An owner can read/update their own requests.
+    // An admin can read all requests.
+    match /requests/{requestId} {
+      allow get, list: if isOwner(request.resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if (isOwner(resource.data.userId) || isAdmin());
+      allow delete: if isOwner(resource.data.userId);
     }
-
-    /**
-     * @description
-     *   Manages documents uploaded by a user for their applications. The user can
-     *   create, read, and delete their own documents. INSS professionals have read-only
-     *   access to these documents.
-     * @path
-     *   /user_profiles/{userId}/documentos/{documentId}
-     * @allow
-     *   An INSS professional (get)s a document at `/user_profiles/user_abc/documentos/doc_456`.
-     * @deny
-     *   An INSS professional (delete)s a document at `/user_profiles/user_abc/documentos/doc_456`.
-     * @principle
-     *   Enforces document ownership for writes and provides role-based read access.
-     */
-    match /user_profiles/{userId}/documentos/{documentId} {
-      allow get: if isOwner(userId) || isINSSProfessional();
-      allow list: if isOwner(userId) || isINSSProfessional();
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+    
+    // Admins collection is read-only for clients, managed server-side.
+    match /admins/{adminId} {
+        allow read: if isSignedIn();
+        allow write: if false;
     }
-
-    /**
-     * @description
-     *   A collection for managing INSS professional roles. The existence of a document
-     *   with a user's UID as its ID grants them special privileges. This collection
-     *   is read-only for all clients to prevent privilege escalation.
-     * @path
-     *   /roles_inss_profissionais/{professionalId}
-     * @allow
-     *   An authenticated user (get)s a document to check a role (though this is usually done via exists()).
-     * @deny
-     *   Any user (create)s a new role document to grant themselves admin access.
-     * @principle
-     *   Provides a secure, read-only lookup table for role-based access control.
-     */
-    match /roles_inss_profissionais/{professionalId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn(); // Allow listing for potential UI features
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
   }
 }

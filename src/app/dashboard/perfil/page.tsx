@@ -13,93 +13,49 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-
-type User = {
-  fullName: string;
-  cpf: string;
-  birthDate?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-};
+import { useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { type UserProfile } from '@/lib/data';
+import { doc, updateDoc } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
 
 export default function PerfilPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState({
-      fullName: '',
-      cpf: '',
-      birthDate: '',
-      phone: '',
-      email: '',
-      address: ''
-  });
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+
+  const [formData, setFormData] = useState<Partial<UserProfile>>({});
 
   useEffect(() => {
-    try {
-      const currentUserCpf = localStorage.getItem('currentUserCpf');
-      if (!currentUserCpf) {
-        router.push('/');
-        return;
-      }
-      
-      const appDataRaw = localStorage.getItem('appData');
-      const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [] };
-      const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
-
-      if (foundUser) {
-        setUser(foundUser);
+    if (userProfile) {
         setFormData({
-            fullName: foundUser.fullName || '',
-            cpf: foundUser.cpf || '',
-            birthDate: foundUser.birthDate || '',
-            phone: foundUser.phone || '',
-            email: foundUser.email || '',
-            address: foundUser.address || '',
-        })
-      } else {
-        router.push('/');
-      }
-    } catch (error) {
-      console.error("Failed to load profile data", error);
-      router.push('/');
+            fullName: userProfile.fullName || '',
+            cpf: userProfile.cpf || '',
+            birthDate: userProfile.birthDate || '',
+            phone: userProfile.phone || '',
+            email: userProfile.email || '',
+            address: userProfile.address || '',
+        });
     }
-  }, [router]);
+  }, [userProfile]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({...prev, [id]: value}));
   }
 
-  const handleSave = () => {
-    if (!user) return;
+  const handleSave = async () => {
+    if (!userDocRef) return;
 
     try {
-        const appDataRaw = localStorage.getItem('appData');
-        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
-
-        const userIndex = appData.users.findIndex((u: User) => u.cpf === user.cpf);
-
-        if (userIndex !== -1) {
-            const updatedUser = {
-                ...appData.users[userIndex],
-                ...formData,
-            };
-            appData.users[userIndex] = updatedUser;
-            localStorage.setItem('appData', JSON.stringify(appData));
-
-            toast({
-                title: "Perfil Atualizado!",
-                description: "Suas informações foram salvas com sucesso."
-            });
-        } else {
-             toast({
-                variant: "destructive",
-                title: "Erro ao Salvar",
-                description: "Usuário não encontrado. Faça o login novamente."
-            });
-        }
+        await updateDoc(userDocRef, formData);
+        toast({
+            title: "Perfil Atualizado!",
+            description: "Suas informações foram salvas com sucesso."
+        });
     } catch (error) {
         toast({
             variant: "destructive",
@@ -109,8 +65,12 @@ export default function PerfilPage() {
     }
   };
   
-  if (!user) {
-    return null; // or a loading spinner
+  if (isUserLoading || isProfileLoading) {
+    return (
+        <div className="flex min-h-screen w-full items-center justify-center bg-background">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    );
   }
 
   return (
@@ -129,30 +89,30 @@ export default function PerfilPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nome Completo</Label>
-                <Input id="fullName" value={formData.fullName} onChange={handleInputChange} />
+                <Input id="fullName" value={formData.fullName || ''} onChange={handleInputChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cpf">CPF</Label>
-                <Input id="cpf" value={formData.cpf} disabled />
+                <Input id="cpf" value={formData.cpf || ''} disabled />
               </div>
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="birthDate">Data de Nascimento</Label>
-                <Input id="birthDate" value={formData.birthDate} onChange={handleInputChange} type="date"/>
+                <Input id="birthDate" value={formData.birthDate || ''} onChange={handleInputChange} type="date"/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone</Label>
-                <Input id="phone" value={formData.phone} onChange={handleInputChange} placeholder="(00) 00000-0000"/>
+                <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} placeholder="(00) 00000-0000"/>
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={formData.email} onChange={handleInputChange} placeholder="seu@email.com"/>
+              <Input id="email" type="email" value={formData.email || ''} onChange={handleInputChange} placeholder="seu@email.com"/>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="address">Endereço</Label>
-                <Input id="address" value={formData.address} onChange={handleInputChange} placeholder="Sua rua, número, bairro..."/>
+                <Input id="address" value={formData.address || ''} onChange={handleInputChange} placeholder="Sua rua, número, bairro..."/>
             </div>
           </form>
         </CardContent>

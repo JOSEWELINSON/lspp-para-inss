@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText } from 'lucide-react';
+import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -33,6 +33,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { collection, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { uploadFile } from '@/firebase/storage';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -42,60 +45,23 @@ const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructiv
     'Compareça presencialmente': 'default'
 };
 
-const fileToDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-};
-
-
 export default function MeusPedidosPage() {
     const router = useRouter();
-    const [myRequests, setMyRequests] = useState<UserRequest[]>([]);
+    const { user } = useUser();
+    const firestore = useFirestore();
+    
+    const requestsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'requests'), where('userId', '==', user.uid)) : null, [user, firestore]);
+    const { data: myRequests, isLoading } = useCollection<UserRequest>(requestsQuery);
+
     const [isExigenciaModalOpen, setIsExigenciaModalOpen] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
     const [exigenciaFiles, setExigenciaFiles] = useState<File[]>([]);
-    
-    useEffect(() => {
-        loadRequests();
-    }, []);
-
-    const loadRequests = () => {
-        try {
-            const currentUserCpf = localStorage.getItem('currentUserCpf');
-            if (!currentUserCpf) {
-                router.push('/');
-                return;
-            }
-
-            const appDataRaw = localStorage.getItem('appData');
-            if(appDataRaw){
-                const appData = JSON.parse(appDataRaw);
-                const userRequests = appData.requests.filter((r: UserRequest) => r.user.cpf === currentUserCpf);
-                setMyRequests(userRequests);
-            }
-        } catch(error) {
-            console.error("Failed to load requests from local storage", error);
-        }
-    };
+    const [isUploading, setIsUploading] = useState(false);
     
     const openDetailsModal = (request: UserRequest) => {
-        // Try to get the full request from session storage, which might contain data URLs
-        try {
-            const sessionRequestRaw = sessionStorage.getItem(request.id);
-            if (sessionRequestRaw) {
-                setCurrentRequest(JSON.parse(sessionRequestRaw));
-            } else {
-                setCurrentRequest(request);
-            }
-        } catch {
-             setCurrentRequest(request);
-        }
+        setCurrentRequest(request);
         setIsDetailsModalOpen(true);
     };
 
@@ -112,75 +78,56 @@ export default function MeusPedidosPage() {
     };
 
     const handleCumprirExigencia = async () => {
-        if (!currentRequest) return;
+        if (!currentRequest || !user) return;
+        setIsUploading(true);
 
         try {
-            const appDataRaw = localStorage.getItem('appData');
-            if (!appDataRaw) return;
-
-            const appData = JSON.parse(appDataRaw);
-            
             const documents: Document[] = [];
             for (const file of exigenciaFiles) {
-                const url = await fileToDataURL(file);
-                documents.push({ name: file.name, url: url });
+                const downloadUrl = await uploadFile(file, `requests/${currentRequest.id}/${file.name}`);
+                documents.push({ name: file.name, url: downloadUrl });
             }
 
-            let fullRequestWithDataUrls = { ...currentRequest };
-
-            const updatedRequests = appData.requests.map((req: UserRequest) => {
-                if (req.id === currentRequest.id && req.exigencia) {
-                    const response = {
-                        text: exigenciaResponseText,
-                        files: documents,
-                        respondedAt: new Date().toISOString(),
-                    };
-                    
-                    fullRequestWithDataUrls = {
-                         ...req,
-                        status: 'Em análise' as RequestStatus,
-                        exigencia: {
-                            ...req.exigencia,
-                            response: response,
-                        }
-                    };
-                    
-                    // Return version for localStorage (without file content)
-                    return {
-                         ...req,
-                        status: 'Em análise' as RequestStatus,
-                        exigencia: {
-                            ...req.exigencia,
-                            response: {
-                                ...response,
-                                files: documents.map(({name}) => ({ name, url: ''}))
-                            },
-                        }
-                    };
+            const response = {
+                text: exigenciaResponseText,
+                files: documents,
+                respondedAt: new Date().toISOString(),
+            };
+            
+            const requestRef = doc(firestore, 'requests', currentRequest.id);
+            const payload = {
+                status: 'Em análise' as RequestStatus,
+                exigencia: {
+                    ...currentRequest.exigencia,
+                    response: response,
                 }
-                return req;
-            });
+            };
             
-            appData.requests = updatedRequests;
-            localStorage.setItem('appData', JSON.stringify(appData));
+            await updateDoc(requestRef, payload);
             
-            // Save the version with data URLs to session storage
-            sessionStorage.setItem(currentRequest.id, JSON.stringify(fullRequestWithDataUrls));
-            
-            loadRequests();
             setIsExigenciaModalOpen(false);
             setExigenciaResponseText("");
             setExigenciaFiles([]);
-            setCurrentRequest(fullRequestWithDataUrls);
+            setCurrentRequest({ ...currentRequest, ...payload });
             setIsDetailsModalOpen(true);
 
         } catch (error) {
             console.error("Failed to update exigencia", error);
+        } finally {
+            setIsUploading(false);
         }
     };
+    
+    const formatDate = (date: any) => {
+        if (!date) return '';
+        if (typeof date === 'string') return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+        if (date.seconds) return format(date.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+        return '';
+    }
 
-    const getPrazoExigencia = (createdAt: string) => {
-        const prazo = addDays(new Date(createdAt), 30);
+    const getPrazoExigencia = (createdAt: any) => {
+        const date = createdAt?.seconds ? new Date(createdAt.seconds * 1000) : new Date(createdAt);
+        const prazo = addDays(date, 30);
         return format(prazo, "dd/MM/yyyy");
     };
 
@@ -203,14 +150,20 @@ export default function MeusPedidosPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {myRequests.length > 0 ? myRequests.map((request) => (
+                        {isLoading ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                                </TableCell>
+                            </TableRow>
+                        ) : myRequests && myRequests.length > 0 ? myRequests.map((request) => (
                             <TableRow key={request.id} onClick={() => openDetailsModal(request)} className={`cursor-pointer ${request.status === 'Exigência' ? 'bg-orange-100/50 dark:bg-orange-900/20' : ''}`}>
                                 <TableCell className="font-medium">{request.benefitTitle}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline">{request.protocol}</Badge>
                                 </TableCell>
                                 <TableCell className="hidden md:table-cell">
-                                    {new Date(request.requestDate).toLocaleDateString('pt-BR')}
+                                    {formatDate(request.requestDate)}
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
@@ -258,7 +211,7 @@ export default function MeusPedidosPage() {
                             </div>
                             <div>
                                 <p className="font-semibold">Data</p>
-                                <p className="text-muted-foreground">{format(new Date(currentRequest.requestDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                                <p className="text-muted-foreground">{formatDate(currentRequest.requestDate)}</p>
                             </div>
                             <div>
                                 <p className="font-semibold">Status</p>
@@ -285,7 +238,7 @@ export default function MeusPedidosPage() {
                                             <div className="bg-muted rounded-lg p-3">
                                                 <p className="text-sm text-foreground">{currentRequest.exigencia.text}</p>
                                             </div>
-                                            <p className="text-xs text-muted-foreground">INSS em {new Date(currentRequest.exigencia.createdAt).toLocaleDateString('pt-BR')}</p>
+                                            <p className="text-xs text-muted-foreground">INSS em {formatDate(currentRequest.exigencia.createdAt)}</p>
                                         </div>
                                     </div>
 
@@ -309,7 +262,7 @@ export default function MeusPedidosPage() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-muted-foreground">Você em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}</p>
+                                                <p className="text-xs text-muted-foreground">Você em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                             </div>
                                              <Avatar className="h-8 w-8">
                                                 <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>
@@ -376,7 +329,7 @@ export default function MeusPedidosPage() {
                                 <div className="bg-muted rounded-lg p-3">
                                     <p className="text-sm text-foreground">{currentRequest.exigencia.text}</p>
                                 </div>
-                                <p className="text-xs text-muted-foreground">INSS em {new Date(currentRequest.exigencia.createdAt).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-xs text-muted-foreground">INSS em {formatDate(currentRequest.exigencia.createdAt)}</p>
                             </div>
                         </div>
 
@@ -400,7 +353,7 @@ export default function MeusPedidosPage() {
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-xs text-muted-foreground">Você em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}</p>
+                                    <p className="text-xs text-muted-foreground">Você em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                 </div>
                                 <Avatar className="h-8 w-8">
                                     <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>
@@ -450,8 +403,8 @@ export default function MeusPedidosPage() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Fechar</AlertDialogCancel>
                          {!currentRequest.exigencia.response && (
-                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim()}>
-                                <Send className="mr-2 h-4 w-4" />
+                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() || isUploading}>
+                                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                                 Enviar Resposta
                             </AlertDialogAction>
                          )}
@@ -462,5 +415,3 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
-
-    

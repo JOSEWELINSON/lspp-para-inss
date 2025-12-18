@@ -20,11 +20,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle, User, ShieldCheck, FileText, Loader2 } from 'lucide-react';
 import { type RequestStatus, type UserRequest } from '@/lib/data';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -38,6 +37,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Separator } from '@/components/ui/separator';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -52,80 +53,51 @@ const activeStatuses: RequestStatus[] = ['Em análise', 'Exigência', 'Compareç
 
 
 export function AdminRequestsTable() {
-    const [allRequests, setAllRequests] = useState<UserRequest[]>([]);
+    const firestore = useFirestore();
+    const requestsCollectionRef = useMemoFirebase(() => collection(firestore, 'requests'), [firestore]);
+    const { data: allRequests, isLoading } = useCollection<UserRequest>(requestsCollectionRef);
+    
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [isExigenciaSubmitting, setIsExigenciaSubmitting] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaText, setExigenciaText] = useState("");
     const [showAll, setShowAll] = useState(false);
-
-
-    useEffect(() => {
-        try {
-            const appDataRaw = localStorage.getItem('appData');
-            if (appDataRaw) {
-                const appData = JSON.parse(appDataRaw);
-                setAllRequests((appData.requests || []).sort((a:UserRequest, b:UserRequest) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()));
-            }
-        } catch (error) {
-            console.error("Failed to load requests for admin", error);
-        }
-    }, []);
+    
+    const sortedRequests = useMemo(() => {
+        if (!allRequests) return [];
+        return [...allRequests].sort((a, b) => (b.requestDate as any).seconds - (a.requestDate as any).seconds);
+    }, [allRequests]);
 
     const displayedRequests = useMemo(() => {
         if (showAll) {
-            return allRequests;
+            return sortedRequests;
         }
-        return allRequests.filter(req => activeStatuses.includes(req.status));
-    }, [allRequests, showAll]);
+        return sortedRequests.filter(req => activeStatuses.includes(req.status));
+    }, [sortedRequests, showAll]);
 
-
-    const updateRequestsInStorage = (updatedRequests: UserRequest[], fullRequestForSession?: UserRequest) => {
-        try {
-            const appDataRaw = localStorage.getItem('appData');
-            const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
-            appData.requests = updatedRequests;
-            localStorage.setItem('appData', JSON.stringify(appData));
-
-             if (fullRequestForSession) {
-                sessionStorage.setItem(fullRequestForSession.id, JSON.stringify(fullRequestForSession));
-            }
-
-        } catch (error) {
-            console.error("Failed to save request status", error);
-        }
-    };
     
     const openDetailsModal = (request: UserRequest) => {
-        // Try to get the full request from session storage, which might contain data URLs
-        try {
-            const sessionRequestRaw = sessionStorage.getItem(request.id);
-            if (sessionRequestRaw) {
-                setCurrentRequest(JSON.parse(sessionRequestRaw));
-            } else {
-                setCurrentRequest(request);
-            }
-        } catch {
-             setCurrentRequest(request);
-        }
+        setCurrentRequest(request);
         setIsDetailsModalOpen(true);
     };
 
-    const handleStatusChange = (requestId: string, newStatus: RequestStatus) => {
+    const handleStatusChange = async (requestId: string, newStatus: RequestStatus) => {
         if (newStatus === 'Exigência' && currentRequest) {
             setIsExigenciaSubmitting(true);
         } else {
-            const updatedRequests = allRequests.map(req => 
-                req.id === requestId ? { ...req, status: newStatus, exigencia: newStatus !== 'Exigência' ? req.exigencia : req.exigencia ? {...req.exigencia, response: undefined} : undefined } : req
-            );
-            setAllRequests(updatedRequests);
-            updateRequestsInStorage(updatedRequests);
-            const updatedCurrentRequest = updatedRequests.find(req => req.id === requestId) || null;
-            setCurrentRequest(updatedCurrentRequest);
+            const requestRef = doc(firestore, 'requests', requestId);
+            const payload: Partial<UserRequest> = { status: newStatus };
+            if (newStatus !== 'Exigência' && currentRequest?.exigencia) {
+                payload.exigencia = { ...currentRequest.exigencia, response: undefined };
+            }
+            await updateDoc(requestRef, payload);
+            if (currentRequest) {
+                 setCurrentRequest({ ...currentRequest, ...payload });
+            }
         }
     };
     
-    const handleExigenciaSubmit = () => {
+    const handleExigenciaSubmit = async () => {
         if (!currentRequest || !exigenciaText) return;
 
         const exigenciaData = {
@@ -133,26 +105,15 @@ export function AdminRequestsTable() {
             createdAt: new Date().toISOString()
         };
 
-        const fullRequestForSession = {
-            ...currentRequest,
+        const requestRef = doc(firestore, 'requests', currentRequest.id);
+        const payload = {
             status: 'Exigência' as RequestStatus,
-            exigencia: exigenciaData,
+            exigencia: exigenciaData
         };
 
-        const updatedRequests = allRequests.map(req => 
-            req.id === currentRequest.id 
-            ? { 
-                ...req, 
-                status: 'Exigência' as RequestStatus,
-                exigencia: exigenciaData,
-              } 
-            : req
-        );
-
-        setAllRequests(updatedRequests);
-        updateRequestsInStorage(updatedRequests, fullRequestForSession);
+        await updateDoc(requestRef, payload);
         
-        setCurrentRequest(fullRequestForSession);
+        setCurrentRequest({ ...currentRequest, ...payload });
 
         // Reset and close sub-modal
         setIsExigenciaSubmitting(false);
@@ -165,6 +126,13 @@ export function AdminRequestsTable() {
         setExigenciaText("");
         // A small delay to allow the modal to close before clearing the data
         setTimeout(() => setCurrentRequest(null), 300);
+    }
+    
+    const formatDate = (date: any) => {
+        if (!date) return '';
+        if (typeof date === 'string') return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+        if (date.seconds) return format(date.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+        return '';
     }
 
 
@@ -186,7 +154,13 @@ export function AdminRequestsTable() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {displayedRequests.length > 0 ? displayedRequests.map((request) => (
+                {isLoading ? (
+                    <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                            <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                        </TableCell>
+                    </TableRow>
+                ) : displayedRequests.length > 0 ? displayedRequests.map((request) => (
                     <TableRow key={request.id} onClick={() => openDetailsModal(request)} className="cursor-pointer">
                         <TableCell className="font-medium">{request.user.name}</TableCell>
                         <TableCell>{request.user.cpf}</TableCell>
@@ -236,7 +210,7 @@ export function AdminRequestsTable() {
                                 </div>
                                 <div>
                                     <p className="font-semibold">Data</p>
-                                    <p className="text-muted-foreground">{format(new Date(currentRequest.requestDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                                    <p className="text-muted-foreground">{formatDate(currentRequest.requestDate)}</p>
                                 </div>
                             </div>
                             
@@ -310,7 +284,7 @@ export function AdminRequestsTable() {
                                                 <div className="bg-muted rounded-lg p-3">
                                                     <p className="text-sm text-foreground">{currentRequest.exigencia.text}</p>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground">INSS em {new Date(currentRequest.exigencia.createdAt).toLocaleDateString('pt-BR')}</p>
+                                                <p className="text-xs text-muted-foreground">INSS em {formatDate(currentRequest.exigencia.createdAt)}</p>
                                             </div>
                                         </div>
 
@@ -337,7 +311,7 @@ export function AdminRequestsTable() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <p className="text-xs text-muted-foreground">Segurado em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}</p>
+                                                    <p className="text-xs text-muted-foreground">Segurado em {formatDate(currentRequest.exigencia.response.respondedAt!)}</p>
                                                 </div>
                                                  <Avatar className="h-8 w-8">
                                                     <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>

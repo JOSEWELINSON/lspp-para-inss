@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { ArrowRight, Loader2 } from "lucide-react";
+import { signInAnonymously } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
-import { mockUser } from "@/lib/data";
+import { useAuth, useFirestore } from "@/firebase";
+import { type UserProfile } from "@/lib/data";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nome completo é obrigatório." }),
@@ -32,6 +35,8 @@ export function UserLoginForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const auth = useAuth();
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,57 +60,53 @@ export function UserLoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+    
     try {
-      const appDataRaw = localStorage.getItem('appData');
-      const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
-      
-      let user = appData.users.find((u: any) => u.cpf === values.cpf);
+      const userCredential = await signInAnonymously(auth);
+      const user = userCredential.user;
 
       if (user) {
-        // User exists, just log in
-        if(user.fullName.toLowerCase() !== values.fullName.toLowerCase()) {
+        const userRef = doc(firestore, "users", user.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+          // User exists, check if name matches
+          const userData = userDoc.data() as UserProfile;
+          if (userData.fullName.toLowerCase() !== values.fullName.toLowerCase() || userData.cpf !== values.cpf) {
             toast({
                 variant: "destructive",
                 title: "Acesso Negado",
-                description: "O nome completo não corresponde ao CPF cadastrado.",
+                description: "Os dados não correspondem ao usuário autenticado.",
             });
+            await auth.signOut();
             setIsLoading(false);
             return;
+          }
+           toast({
+            title: "Bem-vindo de volta!",
+            description: "Acessando seu painel de benefícios.",
+          });
+        } else {
+          // New user, create profile
+          const newUserProfile: UserProfile = {
+            id: user.uid,
+            cpf: values.cpf,
+            fullName: values.fullName,
+          };
+          await setDoc(userRef, newUserProfile);
+          toast({
+            title: "Cadastro realizado com sucesso!",
+            description: "Redirecionando para o seu painel.",
+          });
         }
-        toast({
-          title: "Bem-vindo de volta!",
-          description: "Acessando seu painel de benefícios.",
-        });
-      } else {
-        // New user, register and log in
-        user = {
-          cpf: values.cpf,
-          fullName: values.fullName,
-          birthDate: mockUser.birthDate,
-          phone: mockUser.phone,
-          email: mockUser.email,
-          address: mockUser.address,
-        };
-        appData.users.push(user);
-        localStorage.setItem('appData', JSON.stringify(appData));
-        toast({
-          title: "Cadastro realizado com sucesso!",
-          description: "Redirecionando para o seu painel.",
-        });
+        router.push("/dashboard");
       }
-      
-      // Set current user for the session
-      localStorage.setItem("currentUserCpf", values.cpf);
-
-      router.push("/dashboard");
-
-    } catch (error) {
+    } catch (error: any) {
+       console.error("Firebase Authentication Error: ", error);
        toast({
         variant: "destructive",
-        title: "Erro de Armazenamento",
-        description: "Não foi possível acessar os dados no seu navegador. Verifique as permissões.",
+        title: "Erro de Autenticação",
+        description: error.message || "Não foi possível fazer login. Tente novamente.",
       });
        setIsLoading(false);
     }
