@@ -78,7 +78,7 @@ export function SolicitarBeneficioForm() {
     
     const protocol = `2024${Date.now().toString().slice(-6)}`;
     const selectedBenefit = benefits.find(b => b.id === values.benefitId);
-    const requestId = new Date().toISOString();
+    const requestId = `${user.uid}-${Date.now()}`;
     
     const documentFiles = values.documents as FileList | null;
     const documents: Document[] = [];
@@ -93,7 +93,7 @@ export function SolicitarBeneficioForm() {
                 toast({
                     variant: "destructive",
                     title: "Erro ao Enviar Arquivo",
-                    description: `Não foi possível enviar o arquivo ${file.name}.`,
+                    description: `Não foi possível enviar o arquivo ${file.name}. Verifique suas permissões de armazenamento.`,
                 });
                 setIsLoading(false);
                 return;
@@ -132,7 +132,7 @@ export function SolicitarBeneficioForm() {
         toast({
           variant: "destructive",
           title: "Erro ao Salvar Solicitação",
-          description: "Não foi possível registrar seu pedido. Tente novamente.",
+          description: "Não foi possível registrar seu pedido. Verifique as permissões do Firestore e tente novamente.",
         });
     } finally {
         setIsLoading(false);
