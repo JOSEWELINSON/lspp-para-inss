@@ -1,6 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import { Upload, AlertTriangle, Send } from 'lucide-react';
+import { format, addDays } from 'date-fns';
 
 import {
   Table,
@@ -11,7 +13,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { type RequestStatus, type UserRequest } from '@/lib/data';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -29,12 +46,19 @@ const statusColorClasses: Record<RequestStatus, string> = {
     'Compareça presencialmente': 'bg-blue-500'
 };
 
-
 export default function MeusPedidosPage() {
     const router = useRouter();
     const [myRequests, setMyRequests] = useState<UserRequest[]>([]);
-
+    const [isExigenciaModalOpen, setIsExigenciaModalOpen] = useState(false);
+    const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
+    const [exigenciaResponseText, setExigenciaResponseText] = useState("");
+    const [exigenciaFiles, setExigenciaFiles] = useState<File[]>([]);
+    
     useEffect(() => {
+        loadRequests();
+    }, [router]);
+
+    const loadRequests = () => {
         try {
             const currentUserCpf = localStorage.getItem('currentUserCpf');
             if (!currentUserCpf) {
@@ -51,54 +75,214 @@ export default function MeusPedidosPage() {
         } catch(error) {
             console.error("Failed to load requests from local storage", error);
         }
-    }, [router]);
+    };
+
+    const handleOpenExigencia = (request: UserRequest) => {
+        setCurrentRequest(request);
+        setIsExigenciaModalOpen(true);
+        setExigenciaResponseText(request.exigencia?.response?.text || "");
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setExigenciaFiles(Array.from(e.target.files));
+        }
+    };
+
+    const handleCumprirExigencia = () => {
+        if (!currentRequest) return;
+
+        const updatedRequests = myRequests.map(req => {
+            if (req.id === currentRequest.id && req.exigencia) {
+                return {
+                    ...req,
+                    status: 'Em análise' as RequestStatus,
+                    exigencia: {
+                        ...req.exigencia,
+                        response: {
+                            text: exigenciaResponseText,
+                            files: exigenciaFiles.map(f => f.name),
+                            respondedAt: new Date().toISOString(),
+                        }
+                    }
+                };
+            }
+            return req;
+        });
+
+        try {
+            const appDataRaw = localStorage.getItem('appData');
+            const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
+            // Find and update the specific requests for the logged-in user
+            const currentUserCpf = localStorage.getItem('currentUserCpf');
+            const otherUserRequests = appData.requests.filter((r: UserRequest) => r.user.cpf !== currentUserCpf);
+            appData.requests = [...otherUserRequests, ...updatedRequests];
+            localStorage.setItem('appData', JSON.stringify(appData));
+            
+            setMyRequests(updatedRequests);
+            setIsExigenciaModalOpen(false);
+            setExigenciaResponseText("");
+            setExigenciaFiles([]);
+            setCurrentRequest(null);
+        } catch (error) {
+            console.error("Failed to update exigencia", error);
+        }
+    };
+
+    const getPrazoExigencia = (createdAt: string) => {
+        const prazo = addDays(new Date(createdAt), 30);
+        return format(prazo, "dd/MM/yyyy");
+    };
 
   return (
-    <div className="space-y-6">
-        <div>
-            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl font-headline">Meus Pedidos</h1>
-            <p className="text-muted-foreground">Acompanhe o andamento de todas as suas solicitações.</p>
-        </div>
-        <div className="border rounded-lg">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="hidden w-[100px] sm:table-cell">
-                            <span className="sr-only">Status Icon</span>
-                        </TableHead>
-                        <TableHead>Benefício</TableHead>
-                        <TableHead>Protocolo</TableHead>
-                        <TableHead className="hidden md:table-cell">Data da Solicitação</TableHead>
-                        <TableHead>Status</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {myRequests.length > 0 ? myRequests.map((request) => (
-                        <TableRow key={request.id}>
-                            <TableCell className="hidden sm:table-cell">
-                                <div className={`w-3 h-3 rounded-full ${statusColorClasses[request.status]}`}></div>
-                            </TableCell>
-                            <TableCell className="font-medium">{request.benefitTitle}</TableCell>
-                            <TableCell>
-                                <Badge variant="outline">{request.protocol}</Badge>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                                {new Date(request.requestDate).toLocaleDateString('pt-BR')}
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
-                            </TableCell>
-                        </TableRow>
-                    )) : (
+    <Fragment>
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight lg:text-3xl font-headline">Meus Pedidos</h1>
+                <p className="text-muted-foreground">Acompanhe o andamento de todas as suas solicitações.</p>
+            </div>
+            <div className="border rounded-lg">
+                <Table>
+                    <TableHeader>
                         <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center">
-                                Você ainda não fez nenhuma solicitação.
-                            </TableCell>
+                            <TableHead>Benefício</TableHead>
+                            <TableHead>Protocolo</TableHead>
+                            <TableHead className="hidden md:table-cell">Data da Solicitação</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead><span className="sr-only">Ações</span></TableHead>
                         </TableRow>
-                    )}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {myRequests.length > 0 ? myRequests.map((request) => (
+                            <TableRow key={request.id} className={request.status === 'Exigência' ? 'bg-orange-100/50' : ''}>
+                                <TableCell className="font-medium">{request.benefitTitle}</TableCell>
+                                <TableCell>
+                                    <Badge variant="outline">{request.protocol}</Badge>
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell">
+                                    {new Date(request.requestDate).toLocaleDateString('pt-BR')}
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant={statusVariant[request.status]}>{request.status}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                    {request.status === 'Exigência' && (
+                                        <Button variant="outline" size="sm" onClick={() => handleOpenExigencia(request)}>
+                                            <AlertTriangle className="mr-2 h-4 w-4" />
+                                            Ver Exigência
+                                        </Button>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    Você ainda não fez nenhuma solicitação.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
-    </div>
+
+        {currentRequest?.exigencia && (
+            <AlertDialog open={isExigenciaModalOpen} onOpenChange={setIsExigenciaModalOpen}>
+                <AlertDialogContent className="max-w-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="text-orange-500" />
+                            Cumprir Exigência
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Protocolo: {currentRequest.protocol}
+                            <br />
+                            Prazo para cumprimento: <strong>{getPrazoExigencia(currentRequest.exigencia.createdAt)}</strong>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    
+                    <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4">
+                        <Card className="bg-muted/50">
+                            <CardHeader>
+                                <CardTitle className="text-base">Descrição da Exigência do INSS</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-sm text-muted-foreground">{currentRequest.exigencia.text}</p>
+                            </CardContent>
+                        </Card>
+                        
+                        <div className="space-y-4">
+                            <Label htmlFor="response-text" className="font-semibold">Sua Resposta</Label>
+                            <Textarea
+                                id="response-text"
+                                placeholder="Escreva uma resposta para o servidor do INSS..."
+                                value={exigenciaResponseText}
+                                onChange={(e) => setExigenciaResponseText(e.target.value)}
+                                rows={4}
+                                disabled={!!currentRequest.exigencia.response}
+                            />
+                        </div>
+
+                        <div className="space-y-4">
+                            <Label htmlFor="response-files" className="font-semibold">Anexar Documentos (PDF, JPG, PNG)</Label>
+                             <div className="relative">
+                                <Input 
+                                    type="file" 
+                                    id="response-files" 
+                                    className="pl-12" 
+                                    multiple 
+                                    onChange={handleFileChange} 
+                                    disabled={!!currentRequest.exigencia.response}
+                                />
+                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                    <Upload className="h-5 w-5 text-gray-400" />
+                                </div>
+                            </div>
+                            {exigenciaFiles.length > 0 && (
+                                <div className="text-sm text-muted-foreground">
+                                    <p>Arquivos selecionados:</p>
+                                    <ul className="list-disc pl-5">
+                                        {exigenciaFiles.map(file => <li key={file.name}>{file.name}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+
+                        {currentRequest.exigencia.response && (
+                             <Card className="bg-green-50 border-green-200">
+                                <CardHeader>
+                                    <CardTitle className="text-base text-green-800">Você já respondeu a esta exigência</CardTitle>
+                                    <CardDescription>
+                                        Sua resposta foi enviada em {new Date(currentRequest.exigencia.response.respondedAt!).toLocaleDateString('pt-BR')}. Aguarde a reanálise.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-2 text-sm">
+                                    <p><strong>Sua resposta:</strong> {currentRequest.exigencia.response.text}</p>
+                                    {currentRequest.exigencia.response.files && currentRequest.exigencia.response.files.length > 0 && (
+                                         <div>
+                                            <strong>Arquivos enviados:</strong>
+                                            <ul className="list-disc pl-5">
+                                                {currentRequest.exigencia.response.files.map((file, i) => <li key={i}>{file}</li>)}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                    
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Fechar</AlertDialogCancel>
+                         {!currentRequest.exigencia.response && (
+                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim()}>
+                                <Send className="mr-2 h-4 w-4" />
+                                Enviar Resposta
+                            </AlertDialogAction>
+                         )}
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        )}
+    </Fragment>
   );
 }

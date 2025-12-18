@@ -48,6 +48,15 @@ export type UserRequest = {
   user: {
     name: string;
     cpf: string;
+  };
+  exigencia?: {
+    text: string;
+    createdAt: string;
+    response?: {
+      text: string;
+      files: string[];
+      respondedAt: string;
+    }
   }
 };
 
