@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "welinson@inss.gov.br",
+      email: "welinsonsilva17@gnail.com",
       password: "",
     },
   });
@@ -50,7 +50,7 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     
     // Hardcoded credentials check for prototype
-    if (values.email !== "welinson@inss.gov.br" || values.password !== "INSS17WE") {
+    if (values.email !== "welinsonsilva17@gnail.com" || values.password !== "INSS17WE") {
         toast({
             variant: "destructive",
             title: "Credenciais Inválidas",
