@@ -124,7 +124,7 @@ export default function MeusPedidosPage() {
                 toast({
                     variant: "destructive",
                     title: "Arquivo Muito Grande",
-                    description: `O arquivo "${file.name}" excede o limite de 1MB e não pode ser comprimido.`,
+                    description: `O arquivo "${file.name}" excede o limite de 1MB e não pode ser enviado.`,
                 });
             } else {
                 processedFiles.push(file);
@@ -498,7 +498,7 @@ export default function MeusPedidosPage() {
                                          ref={fileInputRef}
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Imagens maiores que 1MB serão comprimidas. Outros arquivos devem ser menores que 1MB.
+                                         Imagens serão comprimidas para otimizar o envio. Outros arquivos devem ser menores que 1MB.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (
