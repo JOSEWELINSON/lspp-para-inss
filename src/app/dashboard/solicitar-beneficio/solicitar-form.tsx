@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,12 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { benefits, type UserRequest, type UserProfile, type Documento } from "@/lib/data";
 import { useDoc, useFirestore, useUser, useMemoFirebase, useStorage } from "@/firebase";
 import { uploadFile } from "@/firebase/storage";
+import { Input } from "@/components/ui/input";
 
 const formSchema = z.object({
   benefitId: z.string({ required_error: "Por favor, selecione um benefício." }),
@@ -56,7 +56,7 @@ export function SolicitarBeneficioForm() {
   const firestore = useFirestore();
   const storage = useStorage();
   const userCpf = getUserCpf();
-  const fileInputRef = useState<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 
@@ -100,11 +100,10 @@ export function SolicitarBeneficioForm() {
         
         const uploadedDocuments: Documento[] = [];
         if (filesToUpload.length > 0) {
-            const uploadPromises = filesToUpload.map(file => 
-                uploadFile(storage, file, `requests/${protocol}/${file.name}`)
-            );
-            const results = await Promise.all(uploadPromises);
-            uploadedDocuments.push(...results);
+            for (const file of filesToUpload) {
+                const uploadedDoc = await uploadFile(storage, file, `requests/${protocol}/${file.name}`);
+                uploadedDocuments.push(uploadedDoc);
+            }
         }
 
         const newRequest: Omit<UserRequest, 'id'> = {
@@ -201,8 +200,8 @@ export function SolicitarBeneficioForm() {
               )}
             />
 
-            <FormItem>
-                <FormLabel>Anexar Documentos</FormLabel>
+            <div className="space-y-2">
+                <FormLabel>Anexar Documentos (PDF, Foto)</FormLabel>
                 <div className="flex flex-col gap-4">
                   <Input 
                       id="file-upload"
@@ -211,23 +210,23 @@ export function SolicitarBeneficioForm() {
                       onChange={handleFileChange} 
                       multiple 
                       disabled={isLoading}
-                      ref={fileInputRef as any}
+                      ref={fileInputRef}
                   />
                   <Button 
                       type="button" 
                       variant="outline" 
-                      onClick={() => (fileInputRef as any).current.click()} 
+                      onClick={() => fileInputRef.current?.click()} 
                       disabled={isLoading}
                       className="w-fit"
                   >
                       <Upload className="mr-2 h-4 w-4" />
                       Selecionar Arquivos
                   </Button>
-                  <FormDescription>
-                      Você pode anexar laudos, comprovantes, etc. (PDF, PNG, JPG - Máx. 20MB por arquivo).
-                  </FormDescription>
+                  <p className="text-sm text-muted-foreground">
+                      Você pode anexar laudos, comprovantes, etc. (Máx. 20MB por arquivo).
+                  </p>
                 </div>
-            </FormItem>
+            </div>
 
             {filesToUpload.length > 0 && (
                 <div className="space-y-2">

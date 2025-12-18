@@ -100,7 +100,6 @@ export default function MeusPedidosPage() {
         try {
             const uploadedDocuments: Documento[] = [];
             if (filesToUpload.length > 0) {
-                // Use a standard for...of loop for async operations in sequence
                 for (const file of filesToUpload) {
                     const uploadedDoc = await uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`);
                     uploadedDocuments.push(uploadedDoc);
