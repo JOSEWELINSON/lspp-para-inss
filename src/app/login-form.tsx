@@ -8,7 +8,7 @@ import { z } from "zod";
 import Link from "next/link";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { signInAnonymously } from "firebase/auth";
-import { doc, setDoc, getDocs, collection, query, where, limit } from "firebase/firestore";
+import { doc, setDoc, getDocs, collection, query, where, limit, updateDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -83,9 +83,12 @@ export function UserLoginForm() {
                 setIsLoading(false);
                 return;
             }
-            // If name matches, we can proceed. The anonymous user will be used for the session.
-            // We can optionally update the UID in the document if we want to keep it consistent,
-            // but for this prototype, just logging in is enough.
+            
+            // If name matches, update the existing document with the new anonymous UID.
+            // This ensures the current session is linked to the correct profile.
+            const userRef = doc(firestore, "users", userDoc.id);
+            await updateDoc(userRef, { id: authUser.uid });
+
             toast({
                 title: "Bem-vindo de volta!",
                 description: "Acessando seu painel de benefícios.",
@@ -98,6 +101,7 @@ export function UserLoginForm() {
                 cpf: values.cpf,
                 fullName: values.fullName,
             };
+            // Create a document with the UID as the ID
             const userRef = doc(firestore, "users", authUser.uid);
             await setDoc(userRef, newUserProfile);
             toast({
@@ -110,6 +114,9 @@ export function UserLoginForm() {
 
     } catch (error: any) {
        console.error("Login/Signup Error: ", error);
+       if (auth.currentUser) {
+           await auth.signOut();
+       }
        toast({
         variant: "destructive",
         title: "Erro",
