@@ -95,15 +95,24 @@ export default function MeusPedidosPage() {
 
     const handleCumprirExigencia = async () => {
         if (!currentRequest || !userCpf || !firestore || !storage) return;
+        
+        if (!exigenciaResponseText.trim() && filesToUpload.length === 0) {
+            toast({
+                variant: "destructive",
+                title: "Resposta Vazia",
+                description: "Você precisa escrever uma resposta ou anexar um documento."
+            });
+            return;
+        }
+
         setIsUploading(true);
 
         try {
             const uploadedDocuments: Documento[] = [];
-            if (filesToUpload.length > 0) {
-                for (const file of filesToUpload) {
-                    const uploadedDoc = await uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`);
-                    uploadedDocuments.push(uploadedDoc);
-                }
+            // Use a sequential for...of loop for robust async operations
+            for (const file of filesToUpload) {
+                const uploadedDoc = await uploadFile(storage, file, `requests/${currentRequest.protocol}/exigencia/${file.name}`);
+                uploadedDocuments.push(uploadedDoc);
             }
 
             const response = {
@@ -128,12 +137,13 @@ export default function MeusPedidosPage() {
                 description: "Sua resposta foi enviada e o pedido está em reanálise."
             });
             
+            // This order is important to avoid UI glitches
+            const updatedRequest = { ...currentRequest, ...payload };
             setIsExigenciaModalOpen(false);
+            setCurrentRequest(updatedRequest); // Update state for the details modal
+            setIsDetailsModalOpen(true); // Re-open details modal
             setExigenciaResponseText("");
             setFilesToUpload([]);
-            const updatedRequest = { ...currentRequest, ...payload };
-            setCurrentRequest(updatedRequest);
-            setIsDetailsModalOpen(true);
 
         } catch (error) {
             console.error("Failed to update exigencia", error);
@@ -305,7 +315,7 @@ export default function MeusPedidosPage() {
                                                     <p className="text-sm">{currentRequest.exigencia.response.text}</p>
                                                 </div>
                                                 {currentRequest.exigencia.response.documents && currentRequest.exigencia.response.documents.length > 0 && (
-                                                    <div className="text-left mt-2">
+                                                    <div className="text-left mt-2 grid gap-2">
                                                         {currentRequest.exigencia.response.documents.map((doc, index) => (
                                                              <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                                                 <LinkIcon className="h-4 w-4" />
@@ -400,7 +410,7 @@ export default function MeusPedidosPage() {
                         ) : (
                             <Fragment>
                                 <Separator className="my-4" />
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     <Label htmlFor="response-text" className="font-semibold">Sua Resposta</Label>
                                     <Textarea
                                         id="response-text"
@@ -413,30 +423,28 @@ export default function MeusPedidosPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Anexar Novos Documentos</Label>
-                                    <div className="flex flex-col gap-4">
-                                        <Input 
-                                            id="exigencia-file-upload"
-                                            type="file" 
-                                            className="hidden" 
-                                            onChange={handleFileChange} 
-                                            multiple 
-                                            disabled={isUploading}
-                                            ref={fileInputRef}
-                                        />
-                                        <Button 
-                                            type="button" 
-                                            variant="outline" 
-                                            onClick={() => fileInputRef.current?.click()} 
-                                            disabled={isUploading}
-                                            className="w-fit"
-                                        >
-                                            <Upload className="mr-2 h-4 w-4" />
-                                            Selecionar Arquivos
-                                        </Button>
-                                         <p className="text-sm text-muted-foreground">
-                                            Máx: 20MB por arquivo.
-                                        </p>
-                                    </div>
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        onClick={() => fileInputRef.current?.click()} 
+                                        disabled={isUploading}
+                                        className="w-fit"
+                                    >
+                                        <Upload className="mr-2 h-4 w-4" />
+                                        Selecionar Arquivos
+                                    </Button>
+                                    <Input 
+                                        id="exigencia-file-upload"
+                                        type="file" 
+                                        className="hidden" 
+                                        onChange={handleFileChange} 
+                                        multiple 
+                                        disabled={isUploading}
+                                        ref={fileInputRef}
+                                    />
+                                     <p className="text-sm text-muted-foreground">
+                                        Máx: 20MB por arquivo.
+                                    </p>
                                 </div>
                                 {filesToUpload.length > 0 && (
                                     <div className="space-y-2">
@@ -468,9 +476,9 @@ export default function MeusPedidosPage() {
                     </div>
                     
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={closeModalAndReset}>Fechar</AlertDialogCancel>
+                        <AlertDialogCancel onClick={closeModalAndReset} disabled={isUploading}>Fechar</AlertDialogCancel>
                          {!currentRequest.exigencia.response && (
-                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={!exigenciaResponseText.trim() && filesToUpload.length === 0 || isUploading}>
+                            <AlertDialogAction onClick={handleCumprirExigencia} disabled={(!exigenciaResponseText.trim() && filesToUpload.length === 0) || isUploading}>
                                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                                 {isUploading ? 'Enviando...' : 'Enviar Resposta'}
                             </AlertDialogAction>
