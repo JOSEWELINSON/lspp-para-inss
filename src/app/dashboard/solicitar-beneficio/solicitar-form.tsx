@@ -71,19 +71,21 @@ export function SolicitarBeneficioForm() {
   });
   
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
+    if (!e.target.files || !userCpf) return;
     
     setIsUploading(true);
     const files = Array.from(e.target.files);
-    const requestId = `${userCpf}-${Date.now()}`; // Create a temporary unique ID for this upload batch
+    const requestId = `${userCpf}-${Date.now()}`;
     
     try {
-        const uploadPromises = files.map(file => 
-            uploadFile(storage, file, `requests/${requestId}/${file.name}`)
-        );
-        const newDocuments = await Promise.all(uploadPromises);
-        setUploadedDocuments(prev => [...prev, ...newDocuments]);
-        toast({ title: 'Upload Concluído', description: `${files.length} arquivo(s) foram enviados.` });
+      const uploadPromises = files.map(file => 
+        uploadFile(storage, file, `requests/${requestId}/${file.name}`)
+      );
+      
+      const newDocuments = await Promise.all(uploadPromises);
+      
+      setUploadedDocuments(prev => [...prev, ...newDocuments]);
+      toast({ title: 'Upload Concluído', description: `${files.length} arquivo(s) foram enviados.` });
     } catch (error) {
         console.error("Failed to upload files", error);
         toast({
