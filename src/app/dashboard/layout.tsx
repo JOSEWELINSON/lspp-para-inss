@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Logo } from '@/components/logo';
 
 const navItems = [
@@ -47,22 +47,31 @@ function UserMenu() {
 
     useEffect(() => {
         try {
-            const userData = localStorage.getItem('user');
-            if (userData) {
-                setUser(JSON.parse(userData));
+            const currentUserCpf = localStorage.getItem('currentUserCpf');
+            if (!currentUserCpf) {
+                router.push('/');
+                return;
+            }
+            const appDataRaw = localStorage.getItem('appData');
+            const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [] };
+            const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
+            
+            if (foundUser) {
+                setUser(foundUser);
             } else {
                 router.push('/');
             }
         } catch (error) {
+            console.error("Failed to load user session", error);
             router.push('/');
         }
     }, [router]);
 
     const handleLogout = () => {
         try {
-            localStorage.removeItem('user');
+            localStorage.removeItem('currentUserCpf');
         } catch (error) {
-            console.error("Failed to remove user from local storage", error);
+            console.error("Failed to remove current user session", error);
         }
         router.push('/');
     };
@@ -78,7 +87,6 @@ function UserMenu() {
             <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar className="h-8 w-8">
-                    {/* The avatar service is based on email, we don't have it, so we use a fallback */}
                     <AvatarFallback>{nameInitial}</AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Toggle user menu</span>
@@ -126,7 +134,7 @@ export default function DashboardLayout({
   const router = useRouter();
   useEffect(() => {
     try {
-        if (!localStorage.getItem('user')) {
+        if (!localStorage.getItem('currentUserCpf')) {
             router.push('/');
         }
     } catch (error) {

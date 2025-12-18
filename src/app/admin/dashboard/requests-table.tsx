@@ -37,9 +37,10 @@ export function AdminRequestsTable() {
 
     useEffect(() => {
         try {
-            const allRequests = localStorage.getItem('myRequests');
-            if (allRequests) {
-                setRequests(JSON.parse(allRequests));
+            const appDataRaw = localStorage.getItem('appData');
+            if (appDataRaw) {
+                const appData = JSON.parse(appDataRaw);
+                setRequests(appData.requests || []);
             }
         } catch (error) {
             console.error("Failed to load requests for admin", error);
@@ -52,7 +53,10 @@ export function AdminRequestsTable() {
         );
         setRequests(updatedRequests);
         try {
-            localStorage.setItem('myRequests', JSON.stringify(updatedRequests));
+            const appDataRaw = localStorage.getItem('appData');
+            const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
+            appData.requests = updatedRequests;
+            localStorage.setItem('appData', JSON.stringify(appData));
         } catch (error) {
             console.error("Failed to save request status", error);
         }

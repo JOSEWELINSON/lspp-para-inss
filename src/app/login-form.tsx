@@ -21,9 +21,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
+import { mockUser } from "@/lib/data";
 
 const formSchema = z.object({
-  fullName: z.string().min(1, { message: "Nome completo é obrigatório." }),
+  fullName: z.string().min(3, { message: "Nome completo é obrigatório." }),
   cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, { message: "CPF inválido. Use o formato 000.000.000-00." }),
 });
 
@@ -40,7 +41,6 @@ export function UserLoginForm() {
     },
   });
   
-  // Mask for CPF
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "");
     if (value.length > 11) {
@@ -55,24 +55,57 @@ export function UserLoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // Here would be the logic to check if the user exists
-    // For now, we'll just simulate a successful login
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // For demonstration, we'll store the user info in localStorage
-    // In a real app, this would involve a backend and session management
     try {
-      localStorage.setItem("user", JSON.stringify(values));
-      toast({
-        title: "Acesso realizado com sucesso!",
-        description: "Redirecionando para o seu painel.",
-      });
+      const appDataRaw = localStorage.getItem('appData');
+      const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
+      
+      let user = appData.users.find((u: any) => u.cpf === values.cpf);
+
+      if (user) {
+        // User exists, just log in
+        if(user.fullName.toLowerCase() !== values.fullName.toLowerCase()) {
+            toast({
+                variant: "destructive",
+                title: "Acesso Negado",
+                description: "O nome completo não corresponde ao CPF cadastrado.",
+            });
+            setIsLoading(false);
+            return;
+        }
+        toast({
+          title: "Bem-vindo de volta!",
+          description: "Acessando seu painel de benefícios.",
+        });
+      } else {
+        // New user, register and log in
+        user = {
+          cpf: values.cpf,
+          fullName: values.fullName,
+          birthDate: mockUser.birthDate,
+          phone: mockUser.phone,
+          email: mockUser.email,
+          address: mockUser.address,
+        };
+        appData.users.push(user);
+        localStorage.setItem('appData', JSON.stringify(appData));
+        toast({
+          title: "Cadastro realizado com sucesso!",
+          description: "Redirecionando para o seu painel.",
+        });
+      }
+      
+      // Set current user for the session
+      localStorage.setItem("currentUserCpf", values.cpf);
+
       router.push("/dashboard");
+
     } catch (error) {
        toast({
         variant: "destructive",
-        title: "Erro",
-        description: "Não foi possível salvar os dados do usuário no seu navegador.",
+        title: "Erro de Armazenamento",
+        description: "Não foi possível acessar os dados no seu navegador. Verifique as permissões.",
       });
        setIsLoading(false);
     }
@@ -123,7 +156,7 @@ export function UserLoginForm() {
                 <Loader2 className="animate-spin" />
               ) : (
                 <>
-                  Entrar <ArrowRight className="ml-2" />
+                  Entrar / Cadastrar <ArrowRight className="ml-2" />
                 </>
               )}
             </Button>

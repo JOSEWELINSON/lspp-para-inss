@@ -51,14 +51,26 @@ export function SolicitarBeneficioForm() {
 
   useEffect(() => {
     try {
-        const userData = localStorage.getItem('user');
-        if(userData) {
-            setUser(JSON.parse(userData));
+        const currentUserCpf = localStorage.getItem('currentUserCpf');
+        if (!currentUserCpf) {
+            router.push('/');
+            return;
+        }
+
+        const appDataRaw = localStorage.getItem('appData');
+        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [] };
+        const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
+
+        if(foundUser) {
+            setUser(foundUser);
+        } else {
+            router.push('/');
         }
     } catch(e) {
-        // ignore
+        console.error("Failed to get user for request form", e);
+        router.push('/');
     }
-  }, [])
+  }, [router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -97,10 +109,11 @@ export function SolicitarBeneficioForm() {
     };
     
     try {
-        const existingRequestsRaw = localStorage.getItem('myRequests');
-        const existingRequests: UserRequest[] = existingRequestsRaw ? JSON.parse(existingRequestsRaw) : [];
-        const updatedRequests = [...existingRequests, newRequest];
-        localStorage.setItem('myRequests', JSON.stringify(updatedRequests));
+        const appDataRaw = localStorage.getItem('appData');
+        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
+        
+        appData.requests.push(newRequest);
+        localStorage.setItem('appData', JSON.stringify(appData));
 
         toast({
           title: "Solicitação Enviada com Sucesso!",

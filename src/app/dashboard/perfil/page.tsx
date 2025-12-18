@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { mockUser as defaultUser } from '@/lib/data';
 
 type User = {
   fullName: string;
@@ -39,22 +38,31 @@ export default function PerfilPage() {
 
   useEffect(() => {
     try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        const parsedUser: User = JSON.parse(userData);
-        setUser(parsedUser);
+      const currentUserCpf = localStorage.getItem('currentUserCpf');
+      if (!currentUserCpf) {
+        router.push('/');
+        return;
+      }
+      
+      const appDataRaw = localStorage.getItem('appData');
+      const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [] };
+      const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
+
+      if (foundUser) {
+        setUser(foundUser);
         setFormData({
-            fullName: parsedUser.fullName || '',
-            cpf: parsedUser.cpf || '',
-            birthDate: parsedUser.birthDate || defaultUser.birthDate,
-            phone: parsedUser.phone || defaultUser.phone,
-            email: parsedUser.email || defaultUser.email,
-            address: parsedUser.address || defaultUser.address,
+            fullName: foundUser.fullName || '',
+            cpf: foundUser.cpf || '',
+            birthDate: foundUser.birthDate || '',
+            phone: foundUser.phone || '',
+            email: foundUser.email || '',
+            address: foundUser.address || '',
         })
       } else {
         router.push('/');
       }
     } catch (error) {
+      console.error("Failed to load profile data", error);
       router.push('/');
     }
   }, [router]);
@@ -65,16 +73,33 @@ export default function PerfilPage() {
   }
 
   const handleSave = () => {
+    if (!user) return;
+
     try {
-        const updatedUser = {
-            ...user,
-            ...formData,
-        };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        toast({
-            title: "Perfil Atualizado!",
-            description: "Suas informações foram salvas com sucesso."
-        });
+        const appDataRaw = localStorage.getItem('appData');
+        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
+
+        const userIndex = appData.users.findIndex((u: User) => u.cpf === user.cpf);
+
+        if (userIndex !== -1) {
+            const updatedUser = {
+                ...appData.users[userIndex],
+                ...formData,
+            };
+            appData.users[userIndex] = updatedUser;
+            localStorage.setItem('appData', JSON.stringify(appData));
+
+            toast({
+                title: "Perfil Atualizado!",
+                description: "Suas informações foram salvas com sucesso."
+            });
+        } else {
+             toast({
+                variant: "destructive",
+                title: "Erro ao Salvar",
+                description: "Usuário não encontrado. Faça o login novamente."
+            });
+        }
     } catch (error) {
         toast({
             variant: "destructive",
@@ -118,16 +143,16 @@ export default function PerfilPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone</Label>
-                <Input id="phone" value={formData.phone} onChange={handleInputChange} />
+                <Input id="phone" value={formData.phone} onChange={handleInputChange} placeholder="(00) 00000-0000"/>
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={formData.email} onChange={handleInputChange} />
+              <Input id="email" type="email" value={formData.email} onChange={handleInputChange} placeholder="seu@email.com"/>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="address">Endereço</Label>
-                <Input id="address" value={formData.address} onChange={handleInputChange} />
+                <Input id="address" value={formData.address} onChange={handleInputChange} placeholder="Sua rua, número, bairro..."/>
             </div>
           </form>
         </CardContent>

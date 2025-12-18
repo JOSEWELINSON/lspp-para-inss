@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  ArrowRight,
   FileText,
   HeartHandshake,
   Paperclip,
@@ -40,27 +40,42 @@ type User = {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [myRequests, setMyRequests] = useState<UserRequest[]>([]);
 
   useEffect(() => {
     try {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            setUser(JSON.parse(userData));
+        const currentUserCpf = localStorage.getItem('currentUserCpf');
+        if (!currentUserCpf) {
+            router.push('/');
+            return;
         }
 
-        const requestsData = localStorage.getItem('myRequests');
-        if(requestsData){
-            setMyRequests(JSON.parse(requestsData));
+        const appDataRaw = localStorage.getItem('appData');
+        const appData = appDataRaw ? JSON.parse(appDataRaw) : { users: [], requests: [] };
+
+        const foundUser = appData.users.find((u: User) => u.cpf === currentUserCpf);
+        if (foundUser) {
+            setUser(foundUser);
+            const userRequests = appData.requests.filter((r: UserRequest) => r.user.cpf === currentUserCpf);
+            setMyRequests(userRequests);
+        } else {
+            router.push('/');
         }
     } catch(error) {
-        // Could not parse user, will be redirected by layout
+        console.error("Failed to load dashboard data", error);
+        router.push('/');
     }
-  }, []);
+  }, [router]);
 
   const recentRequests = myRequests.slice(0, 3);
   const name = user ? user.fullName.split(' ')[0] : '';
+  
+  if (!user) {
+      return null;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="space-y-1">
