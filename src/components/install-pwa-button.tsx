@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
-import { Download } from "lucide-react";
+import Image from "next/image";
 
 // This interface defines the shape of the event that the browser fires
 // when the app is installable.
@@ -68,13 +67,15 @@ export function InstallPWAButton() {
   }
 
   return (
-    <Button
-      variant="outline"
+    <Image
+      src="https://firebasestorage.googleapis.com/v0/b/yulacesso.appspot.com/o/Screenshot_20250930-070813_(1)_(1).png?alt=media&token=d2815605-ff33-4c40-a04c-e76350e88ef4"
+      alt="Instalar Aplicativo"
+      width={400}
+      height={80}
+      className="cursor-pointer w-full"
       onClick={handleInstallClick}
-      className="w-full"
-    >
-      <Download className="mr-2 h-4 w-4" />
-      Instalar Aplicativo
-    </Button>
+      quality={100}
+      priority
+    />
   );
 }
