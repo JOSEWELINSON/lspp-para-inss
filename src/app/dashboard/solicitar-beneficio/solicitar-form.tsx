@@ -31,7 +31,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { benefits, type UserRequest, type Document, type UserProfile } from "@/lib/data";
-import { useDoc, useFirestore, useUser, useMemoFirebase } from "@/firebase";
+import { useDoc, useFirestore, useUser, useMemoFirebase, useStorage } from "@/firebase";
 import { uploadFile } from "@/firebase/storage";
 
 
@@ -56,6 +56,7 @@ export function SolicitarBeneficioForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const userCpf = getUserCpf();
 
   const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
@@ -95,7 +96,7 @@ export function SolicitarBeneficioForm() {
         if (documentFiles && documentFiles.length > 0) {
             for (const file of Array.from(documentFiles)) {
                 // The path now includes the unique requestId
-                const downloadUrl = await uploadFile(file, `requests/${requestId}/${file.name}`);
+                const downloadUrl = await uploadFile(storage, file, `requests/${requestId}/${file.name}`);
                 documents.push({ name: file.name, url: downloadUrl });
             }
         }
@@ -116,7 +117,7 @@ export function SolicitarBeneficioForm() {
         };
     
         const requestsCollection = collection(firestore, 'requests');
-        await addDoc(requestsCollection, newRequest);
+        const docRef = await addDoc(requestsCollection, newRequest);
 
         toast({
           title: "Solicitação Enviada com Sucesso!",

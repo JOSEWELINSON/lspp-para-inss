@@ -1,18 +1,15 @@
 'use client';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { initializeFirebase } from './index';
-
-// Initialize Firebase and get storage instance
-const { storage } = initializeFirebase();
+import { ref, uploadBytes, getDownloadURL, FirebaseStorage } from 'firebase/storage';
 
 /**
  * Uploads a file to Firebase Storage.
  *
+ * @param storage The FirebaseStorage instance.
  * @param file The file to upload.
  * @param path The path where the file should be stored in Firebase Storage.
  * @returns A promise that resolves with the download URL of the uploaded file.
  */
-export const uploadFile = async (file: File, path: string): Promise<string> => {
+export const uploadFile = async (storage: FirebaseStorage, file: File, path: string): Promise<string> => {
   const storageRef = ref(storage, path);
   
   try {
