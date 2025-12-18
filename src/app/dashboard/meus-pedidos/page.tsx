@@ -225,7 +225,7 @@ export default function MeusPedidosPage() {
                             </div>
                             <div>
                                 <p className="font-semibold">Status</p>
-                                <p><Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge></p>
+                                <div><Badge variant={statusVariant[currentRequest.status]}>{currentRequest.status}</Badge></div>
                             </div>
                         </div>
                         
