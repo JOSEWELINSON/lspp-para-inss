@@ -76,47 +76,36 @@ export function SolicitarBeneficioForm() {
 
     setIsLoading(true);
     
-    const protocol = `2024${Date.now().toString().slice(-6)}`;
-    const selectedBenefit = benefits.find(b => b.id === values.benefitId);
-    const requestId = `${user.uid}-${Date.now()}`;
-    
-    const documentFiles = values.documents as FileList | null;
-    const documents: Document[] = [];
+    try {
+        const protocol = `2024${Date.now().toString().slice(-6)}`;
+        const selectedBenefit = benefits.find(b => b.id === values.benefitId);
+        const requestId = `${user.uid}-${Date.now()}`;
+        
+        const documentFiles = values.documents as FileList | null;
+        const documents: Document[] = [];
 
-    if (documentFiles) {
-        for (const file of Array.from(documentFiles)) {
-             try {
+        if (documentFiles) {
+            for (const file of Array.from(documentFiles)) {
                 const downloadUrl = await uploadFile(file, `requests/${requestId}/${file.name}`);
                 documents.push({ name: file.name, url: downloadUrl });
-            } catch (error) {
-                console.error("Error uploading file to Storage", error);
-                toast({
-                    variant: "destructive",
-                    title: "Erro ao Enviar Arquivo",
-                    description: `Não foi possível enviar o arquivo ${file.name}. Verifique suas permissões de armazenamento.`,
-                });
-                setIsLoading(false);
-                return;
             }
         }
-    }
 
-    const newRequest: Omit<UserRequest, 'id'> = {
-        protocol,
-        benefitId: values.benefitId,
-        benefitTitle: selectedBenefit?.title || 'Benefício Desconhecido',
-        requestDate: serverTimestamp(),
-        status: 'Em análise',
-        description: values.description,
-        documents: documents,
-        userId: user.uid,
-        user: {
-            name: userProfile.fullName,
-            cpf: userProfile.cpf,
-        }
-    };
+        const newRequest: Omit<UserRequest, 'id'> = {
+            protocol,
+            benefitId: values.benefitId,
+            benefitTitle: selectedBenefit?.title || 'Benefício Desconhecido',
+            requestDate: serverTimestamp(),
+            status: 'Em análise',
+            description: values.description,
+            documents: documents,
+            userId: user.uid,
+            user: {
+                name: userProfile.fullName,
+                cpf: userProfile.cpf,
+            }
+        };
     
-    try {
         const requestsCollection = collection(firestore, 'requests');
         await addDoc(requestsCollection, newRequest);
 
@@ -128,11 +117,11 @@ export function SolicitarBeneficioForm() {
         router.push("/dashboard/meus-pedidos");
 
     } catch (error: any) {
-        console.error("Failed to save request to Firestore", error);
+        console.error("Failed to save request:", error);
         toast({
           variant: "destructive",
-          title: "Erro ao Salvar Solicitação",
-          description: "Não foi possível registrar seu pedido. Verifique as permissões do Firestore e tente novamente.",
+          title: "Erro ao Enviar Solicitação",
+          description: "Não foi possível registrar seu pedido. Verifique as permissões de armazenamento ou do banco de dados e tente novamente.",
         });
     } finally {
         setIsLoading(false);
