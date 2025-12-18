@@ -5,6 +5,7 @@ import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import imageCompression from 'browser-image-compression';
+import jsPDF from 'jspdf';
 
 import {
   Table,
@@ -93,34 +94,48 @@ export default function MeusPedidosPage() {
     const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files) return;
 
+        setIsUploading(true);
         const selectedFiles = Array.from(e.target.files);
         const processedFiles: File[] = [];
 
         for (const file of selectedFiles) {
             const isImage = file.type.startsWith('image/');
-            const isTooLarge = file.size > 1024 * 1024; // 1MB
-
-            if (isImage && isTooLarge) {
-                try {
+            
+            if (isImage) {
+                 try {
                     const options = {
                         maxSizeMB: 1,
                         maxWidthOrHeight: 1920,
                         useWebWorker: true,
                     };
                     const compressedFile = await imageCompression(file, options);
-                    processedFiles.push(compressedFile);
-                    toast({
-                        title: "Imagem Comprimida",
-                        description: `A imagem "${file.name}" foi otimizada para o envio.`,
+
+                    const pdf = new jsPDF();
+                    const imgData = await fileToDataUrl(compressedFile);
+                    const img = new Image();
+                    img.src = imgData;
+                    await new Promise(resolve => { img.onload = resolve; });
+
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (img.height * pdfWidth) / img.width;
+                    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                    
+                    const pdfBlob = pdf.getBlob();
+                    const pdfFile = new File([pdfBlob], `${file.name.split('.')[0]}.pdf`, { type: 'application/pdf' });
+                    
+                    processedFiles.push(pdfFile);
+                     toast({
+                        title: "Imagem Convertida para PDF",
+                        description: `A imagem "${file.name}" foi comprimida e salva como PDF.`,
                     });
                 } catch (error) {
                     toast({
                         variant: "destructive",
-                        title: "Falha na Compressão",
-                        description: `Não foi possível comprimir a imagem "${file.name}". Tente uma imagem menor.`,
+                        title: "Falha na Conversão",
+                        description: `Não foi possível processar a imagem "${file.name}".`,
                     });
                 }
-            } else if (isTooLarge) {
+            } else if (file.size > 1024 * 1024) { // 1MB limit for non-images
                 toast({
                     variant: "destructive",
                     title: "Arquivo Muito Grande",
@@ -132,6 +147,7 @@ export default function MeusPedidosPage() {
         }
         
         setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
+        setIsUploading(false);
     };
     
     const removeFile = (index: number) => {
@@ -156,7 +172,7 @@ export default function MeusPedidosPage() {
         try {
             const uploadedDocuments: Documento[] = [];
             for (const file of filesToUpload) {
-                if (file.size > 1024 * 1024) { // 1MB limit
+                if (file.size > 1024 * 1024 * 1.5) { // 1.5MB to be safe
                     toast({
                         variant: "destructive",
                         title: "Arquivo Muito Grande",
@@ -496,9 +512,10 @@ export default function MeusPedidosPage() {
                                          multiple 
                                          disabled={isUploading}
                                          ref={fileInputRef}
+                                         accept="image/*,application/pdf"
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Imagens serão comprimidas para otimizar o envio. Outros arquivos devem ser menores que 1MB.
+                                         Imagens serão convertidas para PDF. Outros arquivos devem ser menores que 1MB.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (

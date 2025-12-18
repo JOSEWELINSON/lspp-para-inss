@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, ChangeEvent, useRef } from "react";
@@ -9,6 +8,7 @@ import { z } from "zod";
 import { Loader2, Upload, File as FileIcon, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 import imageCompression from "browser-image-compression";
+import jsPDF from 'jspdf';
 
 
 import { Button } from "@/components/ui/button";
@@ -82,14 +82,14 @@ export function SolicitarBeneficioForm() {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
+    setIsSubmitting(true);
     const selectedFiles = Array.from(e.target.files);
     const processedFiles: File[] = [];
 
     for (const file of selectedFiles) {
         const isImage = file.type.startsWith('image/');
-        const isTooLarge = file.size > 1024 * 1024; // 1MB
 
-        if (isImage && isTooLarge) {
+        if (isImage) {
             try {
                 const options = {
                     maxSizeMB: 1,
@@ -97,19 +97,35 @@ export function SolicitarBeneficioForm() {
                     useWebWorker: true,
                 };
                 const compressedFile = await imageCompression(file, options);
-                processedFiles.push(compressedFile);
+                
+                // Convert compressed image to PDF
+                const pdf = new jsPDF();
+                const imgData = await fileToDataUrl(compressedFile);
+                const img = new Image();
+                img.src = imgData;
+                await new Promise(resolve => { img.onload = resolve; });
+
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (img.height * pdfWidth) / img.width;
+                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                
+                const pdfBlob = pdf.getBlob();
+                const pdfFile = new File([pdfBlob], `${file.name.split('.')[0]}.pdf`, { type: 'application/pdf' });
+                
+                processedFiles.push(pdfFile);
                 toast({
-                    title: "Imagem Comprimida",
-                    description: `A imagem "${file.name}" foi otimizada para o envio.`,
+                    title: "Imagem Convertida para PDF",
+                    description: `A imagem "${file.name}" foi comprimida e salva como PDF.`,
                 });
+
             } catch (error) {
                 toast({
                     variant: "destructive",
-                    title: "Falha na Compressão",
-                    description: `Não foi possível comprimir a imagem "${file.name}". Tente uma imagem menor.`,
+                    title: "Falha na Conversão",
+                    description: `Não foi possível processar a imagem "${file.name}".`,
                 });
             }
-        } else if (isTooLarge) {
+        } else if (file.size > 1024 * 1024) { // 1MB limit for non-image files
             toast({
                 variant: "destructive",
                 title: "Arquivo Muito Grande",
@@ -121,6 +137,7 @@ export function SolicitarBeneficioForm() {
     }
     
     setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
+    setIsSubmitting(false);
   };
 
   const removeFile = (index: number) => {
@@ -146,8 +163,8 @@ export function SolicitarBeneficioForm() {
         
         const uploadedDocuments: Documento[] = [];
         for (const file of filesToUpload) {
-            // Final check, although compression should handle it for images
-            if (file.size > 1024 * 1024) { 
+            // Final check, although logic should prevent this
+            if (file.size > 1024 * 1024 * 1.5) { // Adding a 1.5MB buffer just in case
                 toast({
                     variant: "destructive",
                     title: "Arquivo Muito Grande",
@@ -266,6 +283,7 @@ export function SolicitarBeneficioForm() {
                       multiple 
                       disabled={isLoading}
                       ref={fileInputRef}
+                      accept="image/*,application/pdf"
                   />
                   <Button 
                       type="button" 
@@ -278,7 +296,7 @@ export function SolicitarBeneficioForm() {
                       Selecionar Arquivos
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                      Imagens serão comprimidas para otimizar o envio. Outros arquivos devem ser menores que 1MB.
+                      Imagens serão convertidas para PDF. Outros arquivos devem ser menores que 1MB.
                   </p>
                 </div>
             </div>
