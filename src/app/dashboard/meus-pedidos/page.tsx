@@ -37,7 +37,6 @@ import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } fro
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile } from '@/firebase/storage';
-import { FormDescription, FormItem, FormControl } from '@/components/ui/form';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -413,9 +412,9 @@ export default function MeusPedidosPage() {
                                         disabled={isUploading}
                                     />
                                 </div>
-                                <FormItem>
-                                    <Label>Anexar Novos Documentos</Label>
-                                    <FormControl>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Anexar Novos Documentos</label>
+                                    <div>
                                         <div className="flex items-center justify-center w-full">
                                             <label htmlFor="exigencia-file-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
                                                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -425,11 +424,11 @@ export default function MeusPedidosPage() {
                                                 <Input id="exigencia-file-upload" type="file" className="hidden" onChange={handleFileChange} multiple disabled={isUploading}/>
                                             </label>
                                         </div>
-                                    </FormControl>
+                                    </div>
                                     <p className="text-sm text-muted-foreground">
                                         Máx: 20MB por arquivo.
                                     </p>
-                                </FormItem>
+                                </div>
                                 {filesToUpload.length > 0 && (
                                     <div className="space-y-2">
                                         <h4 className="text-sm font-medium">Arquivos selecionados:</h4>
@@ -474,3 +473,5 @@ export default function MeusPedidosPage() {
     </Fragment>
   );
 }
+
+    
