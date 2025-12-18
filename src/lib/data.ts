@@ -53,7 +53,8 @@ export type UserProfile = {
 
 export type Documento = {
   name: string;
-  url: string;
+  type: string;
+  dataUrl: string;
 }
 
 export type UserRequest = {

@@ -246,7 +246,7 @@ export function AdminRequestsTable() {
                                             <p className="font-semibold text-sm flex items-center gap-2 mb-2"><Paperclip /> Documentos Anexados:</p>
                                             <div className="grid gap-2">
                                                 {currentRequest.documents.map((doc, index) => (
-                                                    <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                                    <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                                         <LinkIcon className="h-4 w-4" />
                                                         <span className="text-sm font-medium text-primary underline">{doc.name}</span>
                                                     </a>
@@ -310,7 +310,7 @@ export function AdminRequestsTable() {
                                                              <p className="font-semibold text-sm flex items-center gap-2 mb-2 justify-end"><Paperclip /> Documentos da Resposta:</p>
                                                             <div className="grid gap-2">
                                                                 {currentRequest.exigencia.response.documents.map((doc, index) => (
-                                                                    <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors justify-end">
+                                                                    <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors justify-end">
                                                                         <span className="text-sm font-medium text-primary underline">{doc.name}</span>
                                                                         <LinkIcon className="h-4 w-4" />
                                                                     </a>

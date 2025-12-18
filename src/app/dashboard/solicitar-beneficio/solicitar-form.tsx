@@ -30,8 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { benefits, type UserRequest, type UserProfile, type Documento } from "@/lib/data";
-import { useDoc, useFirestore, useUser, useMemoFirebase, useStorage } from "@/firebase";
-import { uploadFile } from "@/firebase/storage";
+import { useDoc, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Input } from "@/components/ui/input";
 
 const formSchema = z.object({
@@ -48,13 +47,21 @@ function getUserCpf() {
     return null;
 }
 
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const storage = useStorage();
   const userCpf = getUserCpf();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,11 +89,11 @@ export function SolicitarBeneficioForm() {
   };
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!userCpf || !userProfile || !storage) {
+    if (!userCpf || !userProfile) {
         toast({
             variant: 'destructive',
-            title: "Erro de Autenticação ou Serviço",
-            description: "Usuário não encontrado ou serviço de armazenamento indisponível. Faça o login novamente.",
+            title: "Erro de Autenticação",
+            description: "Usuário não encontrado. Faça o login novamente.",
         });
         router.push('/');
         return;
@@ -99,12 +106,20 @@ export function SolicitarBeneficioForm() {
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
         
         const uploadedDocuments: Documento[] = [];
-        // Use a sequential for...of loop for robust async operations
         for (const file of filesToUpload) {
-            const filePath = `requests/${protocol}/${Date.now()}_${file.name}`;
-            const uploadedDoc = await uploadFile(storage, file, filePath);
-            uploadedDocuments.push(uploadedDoc);
+            if (file.size > 1024 * 1024) { // 1MB limit
+                toast({
+                    variant: "destructive",
+                    title: "Arquivo Muito Grande",
+                    description: `O arquivo "${file.name}" excede o limite de 1MB.`,
+                });
+                setIsSubmitting(false);
+                return;
+            }
+            const dataUrl = await fileToDataUrl(file);
+            uploadedDocuments.push({ name: file.name, type: file.type, dataUrl });
         }
+
 
         const newRequest: Omit<UserRequest, 'id'> = {
             protocol,
@@ -223,7 +238,7 @@ export function SolicitarBeneficioForm() {
                       Selecionar Arquivos
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                      Você pode anexar laudos, comprovantes, etc. (Máx. 20MB por arquivo).
+                      Você pode anexar laudos, comprovantes, etc. (Máx. 1MB por arquivo).
                   </p>
                 </div>
             </div>

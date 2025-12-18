@@ -32,10 +32,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { uploadFile } from '@/firebase/storage';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -52,12 +51,20 @@ function getUserCpf() {
     return null;
 }
 
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
 export default function MeusPedidosPage() {
     const router = useRouter();
     const { toast } = useToast();
     const { user } = useUser();
     const firestore = useFirestore();
-    const storage = useStorage();
     const userCpf = getUserCpf();
     const fileInputRef = useRef<HTMLInputElement>(null);
     
@@ -95,7 +102,7 @@ export default function MeusPedidosPage() {
 
 
     const handleCumprirExigencia = async () => {
-        if (!currentRequest || !userCpf || !firestore || !storage) return;
+        if (!currentRequest || !userCpf || !firestore) return;
         
         if (!exigenciaResponseText.trim() && filesToUpload.length === 0) {
             toast({
@@ -110,12 +117,18 @@ export default function MeusPedidosPage() {
 
         try {
             const uploadedDocuments: Documento[] = [];
-            // Use a sequential for...of loop for robust async operations
             for (const file of filesToUpload) {
-                const protocol = currentRequest.protocol || `REQ${Date.now()}`;
-                const filePath = `requests/${protocol}/exigencia/${Date.now()}_${file.name}`;
-                const uploadedDoc = await uploadFile(storage, file, filePath);
-                uploadedDocuments.push(uploadedDoc);
+                if (file.size > 1024 * 1024) { // 1MB limit
+                    toast({
+                        variant: "destructive",
+                        title: "Arquivo Muito Grande",
+                        description: `O arquivo "${file.name}" excede o limite de 1MB.`,
+                    });
+                    setIsUploading(false);
+                    return;
+                }
+                const dataUrl = await fileToDataUrl(file);
+                uploadedDocuments.push({ name: file.name, type: file.type, dataUrl });
             }
 
             const response = {
@@ -140,11 +153,10 @@ export default function MeusPedidosPage() {
                 description: "Sua resposta foi enviada e o pedido está em reanálise."
             });
             
-            // This order is important to avoid UI glitches
             const updatedRequest = { ...currentRequest, ...payload };
             setIsExigenciaModalOpen(false);
-            setCurrentRequest(updatedRequest); // Update state for the details modal
-            setIsDetailsModalOpen(true); // Re-open details modal
+            setCurrentRequest(updatedRequest); 
+            setIsDetailsModalOpen(true); 
             setExigenciaResponseText("");
             setFilesToUpload([]);
 
@@ -280,7 +292,7 @@ export default function MeusPedidosPage() {
                                 </h3>
                                 <div className="space-y-2">
                                     {currentRequest.documents.map((doc, index) => (
-                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                        <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                             <LinkIcon className="h-4 w-4" />
                                             <span className="text-sm font-medium text-primary underline">{doc.name}</span>
                                         </a>
@@ -321,7 +333,7 @@ export default function MeusPedidosPage() {
                                                 {currentRequest.exigencia.response.documents && currentRequest.exigencia.response.documents.length > 0 && (
                                                     <div className="text-left mt-2 grid gap-2">
                                                         {currentRequest.exigencia.response.documents.map((doc, index) => (
-                                                             <a href={doc.url} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
+                                                             <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted hover:bg-muted/80 transition-colors">
                                                                 <LinkIcon className="h-4 w-4" />
                                                                 <span className="text-sm font-medium text-primary underline">{doc.name}</span>
                                                             </a>
@@ -448,7 +460,7 @@ export default function MeusPedidosPage() {
                                          ref={fileInputRef}
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Máx: 20MB por arquivo.
+                                         Máx: 1MB por arquivo.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (
