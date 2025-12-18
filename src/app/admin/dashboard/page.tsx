@@ -37,7 +37,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-1">
                 <h1 className="text-2xl font-bold tracking-tight lg:text-3xl font-headline">Solicitações de Benefícios</h1>
                 <p className="text-muted-foreground">
-                    Clique em uma solicitação para ver os detalhes e gerenciá-la.
+                    Navegue pelas abas e clique em uma solicitação para ver os detalhes.
                 </p>
             </div>
             <Card>
@@ -49,3 +49,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
