@@ -1,4 +1,4 @@
-"use client";
+'use client';
 import { useEffect, useState, Fragment, ChangeEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, AlertTriangle, Send, User, ShieldCheck, FileText, Loader2, Link as LinkIcon, Paperclip, X } from 'lucide-react';
@@ -61,6 +61,12 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
+// Firestore has a 1MB limit for documents. Base64 encoding adds about 33% overhead.
+// So, we aim for a file size that, when encoded, stays under this limit.
+const FIRESTORE_SIZE_LIMIT = 1048576; // 1 MiB in bytes
+const MAX_DATA_URL_SIZE = FIRESTORE_SIZE_LIMIT;
+const MAX_RAW_FILE_SIZE_MB = 0.5; // Target 0.5MB for raw images to be safe after compression and encoding
+
 export default function MeusPedidosPage() {
     const router = useRouter();
     const { toast } = useToast();
@@ -76,7 +82,7 @@ export default function MeusPedidosPage() {
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
     const [exigenciaResponseText, setExigenciaResponseText] = useState("");
-    const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+    const [filesToUpload, setFilesToUpload] = useState<Documento[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     
     const openDetailsModal = (request: UserRequest) => {
@@ -102,46 +108,47 @@ export default function MeusPedidosPage() {
         setIsUploading(true);
 
         const selectedFiles = Array.from(e.target.files);
-        const processedFiles: File[] = [];
+        const processedDocuments: Documento[] = [];
 
         for (const file of selectedFiles) {
-            if (file.type.startsWith('image/')) {
-                try {
+            try {
+                let fileToProcess = file;
+                if (file.type.startsWith('image/')) {
                     const options = {
-                        maxSizeMB: 1,
+                        maxSizeMB: MAX_RAW_FILE_SIZE_MB,
                         maxWidthOrHeight: 1920,
                         useWebWorker: true,
                     };
-                    const compressedFile = await imageCompression(file, options);
-                    processedFiles.push(compressedFile);
+                    fileToProcess = await imageCompression(file, options);
+                }
 
-                } catch (error) {
+                const dataUrl = await fileToDataUrl(fileToProcess);
+
+                if (dataUrl.length > MAX_DATA_URL_SIZE) {
                     toast({
                         variant: "destructive",
-                        title: "Falha na compressão",
-                        description: `Não foi possível processar a imagem "${file.name}".`,
+                        title: "Arquivo Muito Grande",
+                        description: `O arquivo "${file.name}" é muito grande para ser enviado, mesmo após a compressão. Tente uma imagem menor ou com menos detalhes.`,
                     });
+                    continue; // Skip this file
                 }
-            } else if (file.type === 'application/pdf') {
-                 if (file.size > 1024 * 1024) { // 1MB limit for PDFs
-                    toast({
-                        variant: "destructive",
-                        title: "Arquivo PDF Muito Grande",
-                        description: `O arquivo "${file.name}" excede 1MB e não pode ser enviado.`,
-                    });
-                } else {
-                    processedFiles.push(file);
-                }
-            } else {
+                
+                processedDocuments.push({
+                    name: fileToProcess.name,
+                    type: fileToProcess.type,
+                    dataUrl: dataUrl,
+                });
+
+            } catch (error) {
                 toast({
                     variant: "destructive",
-                    title: "Tipo de Arquivo Inválido",
-                    description: `O arquivo "${file.name}" não é suportado. Envie apenas imagens ou PDFs.`,
+                    title: "Falha no Processamento",
+                    description: `Não foi possível processar o arquivo "${file.name}".`,
                 });
             }
         }
         
-        setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
+        setFilesToUpload(prevFiles => [...prevFiles, ...processedDocuments]);
         setIsUploading(false);
         if(e.target) e.target.value = '';
     };
@@ -166,16 +173,10 @@ export default function MeusPedidosPage() {
         setIsUploading(true);
 
         try {
-            const uploadedDocuments: Documento[] = [];
-            for (const file of filesToUpload) {
-                const dataUrl = await fileToDataUrl(file);
-                uploadedDocuments.push({ name: file.name, type: file.type, dataUrl });
-            }
-
             const response = {
                 text: exigenciaResponseText,
                 respondedAt: new Date().toISOString(),
-                documents: uploadedDocuments
+                documents: filesToUpload
             };
             
             const requestRef = doc(firestore, 'requests', currentRequest.id);
@@ -201,12 +202,14 @@ export default function MeusPedidosPage() {
             setExigenciaResponseText("");
             setFilesToUpload([]);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to update exigencia", error);
-            toast({
+             toast({
                 variant: "destructive",
-                title: "Falha no Envio",
-                description: "Não foi possível enviar sua resposta. Tente novamente."
+                title: "Erro ao Enviar",
+                description: error.message.includes('exceeds the maximum allowed size')
+                    ? "Um dos arquivos é grande demais. Por favor, anexe arquivos menores."
+                    : "Não foi possível enviar sua resposta. Tente novamente.",
             });
         } finally {
             setIsUploading(false);
@@ -502,18 +505,18 @@ export default function MeusPedidosPage() {
                                          accept="image/*,application/pdf"
                                      />
                                      <p className="text-sm text-muted-foreground">
-                                         Imagens são comprimidas. PDFs devem ter menos de 1MB.
+                                         Imagens são comprimidas para ~0.5MB. Arquivos que excedam 1MB após processamento serão rejeitados.
                                      </p>
                                  </div>
                                 {filesToUpload.length > 0 && (
                                     <div className="space-y-2">
                                         <h4 className="text-sm font-medium">Arquivos selecionados:</h4>
                                         <div className="grid gap-2">
-                                            {filesToUpload.map((file, index) => (
+                                            {filesToUpload.map((doc, index) => (
                                                 <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted">
                                                     <div className="flex items-center gap-2 overflow-hidden">
                                                         <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                                                        <span className="text-sm text-foreground truncate" title={file.name}>{file.name}</span>
+                                                        <span className="text-sm text-foreground truncate" title={doc.name}>{doc.name}</span>
                                                     </div>
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6 flex-shrink-0">
                                                         <X className="h-4 w-4" />

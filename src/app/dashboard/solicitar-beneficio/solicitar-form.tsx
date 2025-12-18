@@ -9,6 +9,7 @@ import { Loader2, Upload, File as FileIcon, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
 import imageCompression from "browser-image-compression";
 
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -56,6 +57,12 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
+// Firestore has a 1MB limit for documents. Base64 encoding adds about 33% overhead.
+// So, we aim for a file size that, when encoded, stays under this limit.
+const FIRESTORE_SIZE_LIMIT = 1048576; // 1 MiB in bytes
+const MAX_DATA_URL_SIZE = FIRESTORE_SIZE_LIMIT;
+const MAX_RAW_FILE_SIZE_MB = 0.5; // Target 0.5MB for raw images to be safe after compression and encoding
+
 export function SolicitarBeneficioForm() {
   const router = useRouter();
   const { toast } = useToast();
@@ -65,7 +72,7 @@ export function SolicitarBeneficioForm() {
   const userCpf = getUserCpf();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+  const [filesToUpload, setFilesToUpload] = useState<Documento[]>([]);
 
   const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile } = useDoc<UserProfile>(userDocRef);
@@ -77,51 +84,52 @@ export function SolicitarBeneficioForm() {
     },
   });
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+ const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     setIsSubmitting(true);
 
     const selectedFiles = Array.from(e.target.files);
-    const processedFiles: File[] = [];
+    const processedDocuments: Documento[] = [];
 
     for (const file of selectedFiles) {
-        if (file.type.startsWith('image/')) {
-            try {
+        try {
+            let fileToProcess = file;
+            if (file.type.startsWith('image/')) {
                 const options = {
-                    maxSizeMB: 1,
+                    maxSizeMB: MAX_RAW_FILE_SIZE_MB,
                     maxWidthOrHeight: 1920,
                     useWebWorker: true,
                 };
-                const compressedFile = await imageCompression(file, options);
-                processedFiles.push(compressedFile);
+                fileToProcess = await imageCompression(file, options);
+            }
 
-            } catch (error) {
-                 toast({
+            const dataUrl = await fileToDataUrl(fileToProcess);
+
+            if (dataUrl.length > MAX_DATA_URL_SIZE) {
+                toast({
                     variant: "destructive",
-                    title: "Falha na compressão da imagem",
-                    description: `Não foi possível processar a imagem "${file.name}".`,
+                    title: "Arquivo Muito Grande",
+                    description: `O arquivo "${file.name}" é muito grande para ser enviado, mesmo após a compressão. Tente uma imagem menor ou com menos detalhes.`,
                 });
+                continue; // Skip this file
             }
-        } else if (file.type === 'application/pdf') {
-            if (file.size > 1024 * 1024) { // 1MB limit for PDFs
-                 toast({
-                    variant: "destructive",
-                    title: "Arquivo PDF Muito Grande",
-                    description: `O arquivo "${file.name}" excede 1MB e não pode ser enviado.`,
-                });
-            } else {
-                processedFiles.push(file);
-            }
-        } else {
-             toast({
+            
+            processedDocuments.push({
+                name: fileToProcess.name,
+                type: fileToProcess.type,
+                dataUrl: dataUrl,
+            });
+
+        } catch (error) {
+            toast({
                 variant: "destructive",
-                title: "Tipo de Arquivo Inválido",
-                description: `O arquivo "${file.name}" não é suportado. Envie apenas imagens ou PDFs.`,
+                title: "Falha no Processamento",
+                description: `Não foi possível processar o arquivo "${file.name}".`,
             });
         }
     }
     
-    setFilesToUpload(prevFiles => [...prevFiles, ...processedFiles]);
+    setFilesToUpload(prevFiles => [...prevFiles, ...processedDocuments]);
     setIsSubmitting(false);
     if(e.target) e.target.value = '';
   };
@@ -147,13 +155,6 @@ export function SolicitarBeneficioForm() {
     try {
         const protocol = `2024${Date.now().toString().slice(-6)}`;
         const selectedBenefit = benefits.find(b => b.id === values.benefitId);
-        
-        const uploadedDocuments: Documento[] = [];
-        for (const file of filesToUpload) {
-            const dataUrl = await fileToDataUrl(file);
-            uploadedDocuments.push({ name: file.name, type: file.type, dataUrl });
-        }
-
 
         const newRequest: Omit<UserRequest, 'id'> = {
             protocol,
@@ -167,7 +168,7 @@ export function SolicitarBeneficioForm() {
                 name: userProfile.fullName,
                 cpf: userProfile.cpf,
             },
-            documents: uploadedDocuments
+            documents: filesToUpload
         };
     
         await addDoc(collection(firestore, 'requests'), newRequest);
@@ -184,7 +185,9 @@ export function SolicitarBeneficioForm() {
         toast({
           variant: "destructive",
           title: "Erro ao Enviar Solicitação",
-          description: "Não foi possível registrar seu pedido. Tente novamente.",
+          description: error.message.includes('exceeds the maximum allowed size')
+            ? "Um ou mais arquivos são grandes demais, mesmo após a compressão. Por favor, envie arquivos menores."
+            : "Não foi possível registrar seu pedido. Tente novamente.",
         });
     } finally {
         setIsSubmitting(false);
@@ -273,7 +276,7 @@ export function SolicitarBeneficioForm() {
                       Selecionar Arquivos
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                      Imagens são comprimidas. PDFs devem ter menos de 1MB.
+                      Imagens são comprimidas para ~0.5MB. Arquivos que excedam 1MB após processamento serão rejeitados.
                   </p>
                 </div>
             </div>
@@ -282,11 +285,11 @@ export function SolicitarBeneficioForm() {
                 <div className="space-y-2">
                     <h4 className="text-sm font-medium">Arquivos selecionados:</h4>
                     <div className="grid gap-2">
-                        {filesToUpload.map((file, index) => (
+                        {filesToUpload.map((doc, index) => (
                             <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted">
                                 <div className="flex items-center gap-2 overflow-hidden">
                                     <FileIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                                    <span className="text-sm text-foreground truncate" title={file.name}>{file.name}</span>
+                                    <span className="text-sm text-foreground truncate" title={doc.name}>{doc.name}</span>
                                 </div>
                                 <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="h-6 w-6 flex-shrink-0">
                                     <X className="h-4 w-4" />
