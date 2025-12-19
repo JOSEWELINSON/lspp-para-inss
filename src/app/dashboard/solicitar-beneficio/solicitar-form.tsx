@@ -74,7 +74,7 @@ export function SolicitarBeneficioForm() {
 
   const [filesToUpload, setFilesToUpload] = useState<Documento[]>([]);
 
-  const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
+  const userDocRef = useMemoFirebase(() => userCpf && firestore ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile } = useDoc<UserProfile>(userDocRef);
 
   const form = useForm<z.infer<typeof formSchema>>({

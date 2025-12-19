@@ -48,10 +48,10 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const userCpf = getUserCpf();
 
-  const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
+  const userDocRef = useMemoFirebase(() => userCpf && firestore ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
   
-  const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
+  const requestsQuery = useMemoFirebase(() => userCpf && firestore ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
   const { data: allRequests, isLoading: areRequestsLoading } = useCollection<UserRequest>(requestsQuery);
 
   const myRequests = useMemo(() => {

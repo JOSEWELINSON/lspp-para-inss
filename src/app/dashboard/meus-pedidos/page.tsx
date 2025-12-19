@@ -73,7 +73,7 @@ export default function MeusPedidosPage() {
     const userCpf = getUserCpf();
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    const requestsQuery = useMemoFirebase(() => userCpf ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
+    const requestsQuery = useMemoFirebase(() => userCpf && firestore ? query(collection(firestore, 'requests'), where('userId', '==', userCpf)) : null, [userCpf, firestore]);
     const { data: myRequests, isLoading } = useCollection<UserRequest>(requestsQuery);
 
     const [isExigenciaModalOpen, setIsExigenciaModalOpen] = useState(false);

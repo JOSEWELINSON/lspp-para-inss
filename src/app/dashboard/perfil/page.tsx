@@ -32,7 +32,7 @@ export default function PerfilPage() {
   const firestore = useFirestore();
   const userCpf = getUserCpf();
 
-  const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
+  const userDocRef = useMemoFirebase(() => userCpf && firestore ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
   const [formData, setFormData] = useState<Partial<UserProfile>>({});

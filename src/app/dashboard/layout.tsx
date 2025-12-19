@@ -46,7 +46,7 @@ function UserMenu() {
     const firestore = useFirestore();
     const userCpf = getUserCpf();
 
-    const userDocRef = useMemoFirebase(() => userCpf ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
+    const userDocRef = useMemoFirebase(() => userCpf && firestore ? doc(firestore, 'users', userCpf) : null, [userCpf, firestore]);
     const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
     const handleLogout = async () => {
@@ -141,64 +141,55 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col">
-        {/* Desktop Sidebar */}
-        <div className="hidden md:flex md:fixed md:inset-y-0 md:z-50 md:w-56 lg:w-72 md:flex-col">
-            <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-card px-6 pb-4">
-                <div className="flex h-16 shrink-0 items-center">
-                    <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-                        <Logo />
-                    </Link>
-                </div>
-                <nav className="flex flex-1 flex-col">
-                    <ul role="list" className="flex flex-1 flex-col gap-y-7">
-                        <li>
-                            <ul role="list" className="-mx-2 space-y-1">
-                                <NavLinks />
-                            </ul>
-                        </li>
-                    </ul>
-                </nav>
-            </div>
+    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
+      <div className="hidden border-r bg-muted/40 md:block">
+        <div className="flex h-full max-h-screen flex-col gap-2">
+          <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+            <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+              <Logo />
+            </Link>
+          </div>
+          <div className="flex-1">
+            <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
+                <NavLinks />
+            </nav>
+          </div>
         </div>
-
-        {/* Mobile Header & Sidebar */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-card px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 md:hidden">
-            <Sheet>
-                <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="shrink-0">
-                        <Menu className="h-5 w-5" />
-                        <span className="sr-only">Toggle navigation menu</span>
-                    </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="flex flex-col">
-                    <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
-                    <nav className="grid gap-2 text-lg font-medium">
-                        <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold mb-4">
-                            <Logo />
-                        </Link>
-                        <NavLinks />
-                    </nav>
-                </SheetContent>
-            </Sheet>
-            <div className="flex flex-1 justify-end">
-                <UserMenu />
-            </div>
-        </div>
-        
-        {/* Desktop Header */}
-        <div className="hidden md:flex sticky top-0 z-40 h-16 shrink-0 items-center gap-x-4 border-b bg-card px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 md:pl-64 lg:pl-80">
-            <div className="flex flex-1 justify-end">
-                <UserMenu />
-            </div>
-        </div>
-
-        {/* Main Content */}
-        <main className="py-10 md:pl-64 lg:pl-80">
-            <div className="px-4 sm:px-6 lg:px-8 animate-in fade-in-50">
-                 {children}
-            </div>
+      </div>
+      <div className="flex flex-col">
+        <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0 md:hidden"
+              >
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle navigation menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="flex flex-col">
+              <nav className="grid gap-2 text-lg font-medium">
+                <Link
+                  href="#"
+                  className="flex items-center gap-2 text-lg font-semibold"
+                >
+                  <Logo />
+                </Link>
+                <NavLinks />
+              </nav>
+            </SheetContent>
+          </Sheet>
+          <div className="w-full flex-1">
+            {/* Can add a search form here */}
+          </div>
+          <UserMenu />
+        </header>
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 animate-in fade-in-50">
+            {children}
         </main>
+      </div>
     </div>
   );
 }
