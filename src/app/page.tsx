@@ -6,9 +6,9 @@ export default function Home() {
     <main className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <div className="relative w-full max-w-md">
         <UserLoginForm />
-        <div className="mt-4 flex justify-center">
-            <InstallPWAButton />
-        </div>
+      </div>
+      <div className="fixed bottom-6 right-6 z-50">
+        <InstallPWAButton />
       </div>
     </main>
   );

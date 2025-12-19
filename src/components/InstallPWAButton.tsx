@@ -27,6 +27,11 @@ export function InstallPWAButton() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // Check if the app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        setDeferredPrompt(null);
+    }
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
@@ -55,16 +60,18 @@ export function InstallPWAButton() {
   };
 
   if (!deferredPrompt) {
-    return null; // Don't show the button if PWA installation is not available
+    return null; // Don't show the button if PWA installation is not available or already installed
   }
 
   return (
     <Button
-      variant="outline"
+      variant="default"
+      size="lg"
+      className="rounded-full h-16 w-16 shadow-lg"
+      aria-label="Instalar Aplicativo"
       onClick={handleInstallClick}
     >
-      <Download className="mr-2 h-4 w-4" />
-      Instalar Aplicativo
+      <Download className="h-6 w-6" />
     </Button>
   );
 }
