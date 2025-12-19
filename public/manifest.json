@@ -1,22 +1,22 @@
 {
-    "name": "LSPP do INSS",
-    "short_name": "LSPP INSS",
-    "description": "Aplicativo para gestão de benefícios do INSS",
-    "start_url": "/",
-    "display": "standalone",
-    "orientation": "portrait",
-    "background_color": "#F0F4F7",
-    "theme_color": "#2979FF",
-    "icons": [
-        {
-            "src": "https://firebasestorage.googleapis.com/v0/b/yulacesso.appspot.com/o/Screenshot_20250930-070813_(1)_(1).png?alt=media&token=d2815605-ff33-4c40-a04c-e76350e88ef4",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "https://firebasestorage.googleapis.com/v0/b/yulacesso.appspot.com/o/Screenshot_20250930-070813_(1)_(1).png?alt=media&token=d2815605-ff33-4c40-a04c-e76350e88ef4",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ]
+  "name": "LSPP do INSS",
+  "short_name": "LSPP INSS",
+  "description": "Aplicativo para gestão de benefícios do INSS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F0F4F7",
+  "theme_color": "#2979FF",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://firebasestorage.googleapis.com/v0/b/yulacesso.appspot.com/o/Screenshot_20250930-070813_(1)_(1).png?alt=media&token=d2815605-ff33-4c40-a04c-e76350e88ef4",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://firebasestorage.googleapis.com/v0/b/yulacesso.appspot.com/o/Screenshot_20250930-070813_(1)_(1).png?alt=media&token=d2815605-ff33-4c40-a04c-e76350e88ef4",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
