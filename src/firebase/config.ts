@@ -1,6 +1,7 @@
 
-// As chaves de configuração foram movidas para variáveis de ambiente.
-// Preencha o arquivo .env com os valores do seu projeto Firebase.
+// As chaves de configuração são obtidas das variáveis de ambiente.
+// Garanta que o arquivo .env (localmente) ou as configurações do seu provedor de hospedagem (Vercel, etc.)
+// contenham os valores corretos do seu projeto Firebase.
 export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
