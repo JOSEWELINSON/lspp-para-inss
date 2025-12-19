@@ -415,30 +415,57 @@ export function AdminRequestsTable({ requests: allRequests, isLoading }: { reque
                                     </div>
                                 </div>
 
-                                {currentRequest.status === 'Deferido' && currentRequest.motivoDeferimento && (
-                                   <div className="space-y-2">
-                                        <h3 className="font-semibold flex items-center gap-2 text-green-600">
-                                            <Info />
-                                            Parecer de Deferimento
-                                        </h3>
-                                        <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
-                                            <p className="text-sm text-foreground italic">"{currentRequest.motivoDeferimento}"</p>
-                                        </div>
-                                    </div>
-                                )}
+                                <Separator />
+                                
+                                 {/* Despacho Section */}
+                                <div className="space-y-2">
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <Info />
+                                        Despacho do Analista
+                                    </h3>
+                                    <div className="space-y-4 border rounded-lg p-4">
+                                        {currentRequest.status === 'Deferido' && currentRequest.motivoDeferimento && (
+                                            <div className="flex gap-3">
+                                                <Avatar className="h-8 w-8 border-2 border-green-500">
+                                                    <AvatarFallback className="bg-green-500 text-white">
+                                                        <ShieldCheck className="h-5 w-5" />
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex-1 space-y-1">
+                                                    <div className="bg-muted rounded-lg p-3">
+                                                        <p className="text-sm text-foreground font-semibold mb-1">Despacho automático</p>
+                                                        <p className="text-sm text-muted-foreground">O referido benefício foi deferido/concedido.</p>
+                                                        <p className="text-sm text-foreground mt-2 pt-2 border-t">"{currentRequest.motivoDeferimento}"</p>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground">INSS em {formatDate(currentRequest.requestDate)}</p>
+                                                </div>
+                                            </div>
+                                        )}
 
-                                {currentRequest.status === 'Indeferido' && currentRequest.motivoIndeferimento && (
-                                   <div className="space-y-2">
-                                        <h3 className="font-semibold flex items-center gap-2 text-destructive">
-                                            <Info />
-                                            Motivo do Indeferimento
-                                        </h3>
-                                        <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded-r-lg">
-                                            <p className="text-sm text-foreground italic">"{currentRequest.motivoIndeferimento}"</p>
-                                        </div>
-                                    </div>
-                                )}
+                                        {currentRequest.status === 'Indeferido' && currentRequest.motivoIndeferimento && (
+                                            <div className="flex gap-3">
+                                                <Avatar className="h-8 w-8 border-2 border-destructive">
+                                                    <AvatarFallback className="bg-destructive text-destructive-foreground">
+                                                        <ShieldCheck className="h-5 w-5" />
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex-1 space-y-1">
+                                                    <div className="bg-muted rounded-lg p-3">
+                                                        <p className="text-sm text-foreground font-semibold mb-1">Despacho automático</p>
+                                                        <p className="text-sm text-muted-foreground">O referido benefício foi indeferido.</p>
+                                                        <p className="text-sm text-foreground mt-2 pt-2 border-t">"{currentRequest.motivoIndeferimento}"</p>
+                                                    </div>
+                                                     <p className="text-xs text-muted-foreground">INSS em {formatDate(currentRequest.requestDate)}</p>
+                                                </div>
+                                            </div>
+                                        )}
 
+                                        {(currentRequest.status !== 'Deferido' && currentRequest.status !== 'Indeferido') && (
+                                            <p className="text-sm text-muted-foreground text-center">Nenhum despacho final para esta solicitação.</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <Separator />
 
                                 {/* Initial Request Details */}
                                 <div className="space-y-2">
@@ -562,3 +589,5 @@ export function AdminRequestsTable({ requests: allRequests, isLoading }: { reque
         </Fragment>
     );
 }
+
+    
