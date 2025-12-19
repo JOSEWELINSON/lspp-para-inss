@@ -37,10 +37,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useMemoFirebase, FirestorePermissionError, errorEmitter } from '@/firebase';
-import { collection, doc, updateDoc } from 'firebase/firestore';
+import { useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 
 const statusVariant: Record<RequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     'Em análise': 'secondary',
@@ -88,7 +88,7 @@ function RequestsList({ requests, onRowClick, isLoading }: { requests: UserReque
     return (
         <Fragment>
             {/* Desktop Table View */}
-            <div className="hidden md:block">
+            <div className="hidden md:block border rounded-lg">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -116,7 +116,7 @@ function RequestsList({ requests, onRowClick, isLoading }: { requests: UserReque
             </div>
 
             {/* Mobile Card View */}
-            <div className="md:hidden space-y-4 p-4">
+            <div className="md:hidden space-y-4">
                 {requests.map((request) => (
                     <Card key={request.id} onClick={() => onRowClick(request)} className="cursor-pointer">
                         <CardHeader>
@@ -138,10 +138,8 @@ function RequestsList({ requests, onRowClick, isLoading }: { requests: UserReque
 }
 
 
-export function AdminRequestsTable() {
+export function AdminRequestsTable({ requests: allRequests, isLoading }: { requests: UserRequest[], isLoading: boolean }) {
     const firestore = useFirestore();
-    const requestsCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'requests') : null, [firestore]);
-    const { data: allRequests, isLoading } = useCollection<UserRequest>(requestsCollectionRef);
     
     const [modalState, setModalState] = useState<'details' | 'exigencia' | 'indeferimento' | 'deferimento' | null>(null);
     const [currentRequest, setCurrentRequest] = useState<UserRequest | null>(null);
@@ -271,24 +269,34 @@ export function AdminRequestsTable() {
     
     return (
         <Fragment>
-            <Tabs defaultValue="active" className="w-full">
-                <div className="px-4 pt-4">
-                    <TabsList>
-                        <TabsTrigger value="active">Ativas</TabsTrigger>
-                        <TabsTrigger value="finished">Finalizadas</TabsTrigger>
-                        <TabsTrigger value="all">Todas</TabsTrigger>
-                    </TabsList>
-                </div>
-                <TabsContent value="active">
-                    <RequestsList requests={filteredRequests.active} onRowClick={openDetailsModal} isLoading={isLoading} />
-                </TabsContent>
-                <TabsContent value="finished">
-                    <RequestsList requests={filteredRequests.finished} onRowClick={openDetailsModal} isLoading={isLoading} />
-                </TabsContent>
-                <TabsContent value="all">
-                    <RequestsList requests={filteredRequests.all} onRowClick={openDetailsModal} isLoading={isLoading} />
-                </TabsContent>
-            </Tabs>
+             <Card>
+                <CardHeader className="px-4 md:px-6 pt-4 md:pt-6">
+                    <CardTitle>Caixa de Entrada</CardTitle>
+                    <CardDescription>Navegue pelas abas e clique em uma solicitação para ver os detalhes.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Tabs defaultValue="active" className="w-full">
+                        <div className="px-4 md:px-6">
+                            <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="active">Ativas</TabsTrigger>
+                                <TabsTrigger value="finished">Finalizadas</TabsTrigger>
+                                <TabsTrigger value="all">Todas</TabsTrigger>
+                            </TabsList>
+                        </div>
+                        <div className="p-0 md:p-2">
+                            <TabsContent value="active">
+                                <RequestsList requests={filteredRequests.active} onRowClick={openDetailsModal} isLoading={isLoading} />
+                            </TabsContent>
+                            <TabsContent value="finished">
+                                <RequestsList requests={filteredRequests.finished} onRowClick={openDetailsModal} isLoading={isLoading} />
+                            </TabsContent>
+                            <TabsContent value="all">
+                                <RequestsList requests={filteredRequests.all} onRowClick={openDetailsModal} isLoading={isLoading} />
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+                </CardContent>
+            </Card>
             
             {currentRequest && (
                 <AlertDialog open={!!modalState} onOpenChange={(open) => !open && closeModal()}>
@@ -554,7 +562,3 @@ export function AdminRequestsTable() {
         </Fragment>
     );
 }
-
-    
-
-    
